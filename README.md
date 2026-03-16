@@ -539,7 +539,7 @@ DeviceFileEvents
 
 `T1071 Application Layer Protocol` `DeviceFileEvents` `Malware Identification`
 
-> 💡 Same query as Q19 — the `FolderPath` column minus the filename is your answer.
+> 💡 Same query as Q19 - the `FolderPath` column minus the filename is your answer.
 
 ---
 
@@ -982,9 +982,9 @@ DeviceFileEvents
 
 ## LESSONS_LEARNED
 
-**Incomplete Remediation Enables Return Attacks** — Pre-staged AnyDesk from "The Broker" directly enabled this intrusion months later.
+**Incomplete Remediation Enables Return Attacks** - Pre-staged AnyDesk from "The Broker" directly enabled this intrusion months later.
 
-**Obfuscation Defeats Signature Detection** — Three download methods for a single payload; behavioral monitoring is essential.
+**Obfuscation Defeats Signature Detection** - Three download methods for a single payload; behavioral monitoring is essential.
 
 **Legitimate Tools Are the Weapon** — AnyDesk, bitsadmin, net.exe, wmic. LOLBin monitoring is non-negotiable.
 
@@ -996,12 +996,12 @@ DeviceFileEvents
 
 ## REMEDIATION_ACTIONS
 
-**Immediate** — Isolate AS-PC2 and AS-SRV · Reset `david.mitchell` and `as.srv.administrator` credentials · Remove `C:\Users\Public\AnyDesk.exe` · Block `sync.cloud-endpoint.net`, `cdn.cloud-endpoint.net`, `88.97.164.155`
+**Immediate** - Isolate AS-PC2 and AS-SRV · Reset `david.mitchell` and `as.srv.administrator` credentials · Remove `C:\Users\Public\AnyDesk.exe` · Block `sync.cloud-endpoint.net`, `cdn.cloud-endpoint.net`, `88.97.164.155`
 
-**Short Term** — Restrict remote tools to approved list · Enable PowerShell Script Block Logging · Alert on LOLBin network activity · Monitor Defender registry keys · Hunt for unknown executables in `C:\ProgramData\`
+**Short Term** - Restrict remote tools to approved list · Enable PowerShell Script Block Logging · Alert on LOLBin network activity · Monitor Defender registry keys · Hunt for unknown executables in `C:\ProgramData\`
 
-**Long Term** — MFA for all RDP · Network segmentation · Honeypot files in shares · Full remediation review of "The Broker" · Immutable off-site backups · Application allowlisting
+**Long Term** - MFA for all RDP · Network segmentation · Honeypot files in shares · Full remediation review of "The Broker" · Immutable off-site backups · Application allowlisting
 
 ---
 
-*SancLogic Cyber Range — The Buyer | MDE + Sentinel (KQL)*
+*SancLogic Cyber Range - The Buyer | MDE + Sentinel (KQL)*
