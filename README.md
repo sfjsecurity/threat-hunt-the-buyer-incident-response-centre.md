@@ -84,11 +84,12 @@ The investigation revealed a multi-stage intrusion spanning two weeks. The threa
 **Why It Matters:** The ransom note dropped on the file server explicitly identified the ransomware group. Akira is a ransomware-as-a-service (RaaS) operation known for double extortion - encrypting files while threatening to publish stolen data if the ransom is not paid.
 
 ```kql
-// Find the ransom note dropped on the file server
+// Find the ransom note dropped on the file server - answers to Q1, Q2, Q3 and Q4 are inside the file
 DeviceFileEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where ActionType == "FileCreated"
 | where FileName contains "readme"
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | project TimeGenerated, DeviceName, FileName, FolderPath
 | order by TimeGenerated asc
 ```
@@ -101,16 +102,6 @@ DeviceFileEvents
 **Why It Matters:** The TOR onion address provides the victim a channel to communicate and negotiate with the attacker. Documenting this is critical for threat intelligence sharing and law enforcement reporting.
 
 > ⚠️ Note: TOR addresses often contain lowercase `l` characters that visually resemble the number `1` - always copy-paste rather than retyping.
-
-```kql
-// Open the ransom note file identified in Q1 and locate the Contact/TOR section
-DeviceFileEvents
-| where ActionType == "FileCreated"
-| where FileName contains "readme"
-| where DeviceName in ("as-pc1", "as-pc2", "as-srv")
-| project TimeGenerated, DeviceName, FileName, FolderPath
-| order by TimeGenerated asc
-```
 
 ---
 
@@ -128,15 +119,7 @@ DeviceFileEvents
 
 **Why It Matters:** Identifying the encrypted extension confirms the ransomware variant and enables scope assessment of impacted files across the environment.
 
-```kql
-// Find encrypted files to identify the new extension
-DeviceFileEvents
-| where DeviceName in ("as-pc1", "as-pc2", "as-srv")
-| where ActionType == "FileCreated"
-| where FolderPath contains "Shares"
-| project TimeGenerated, DeviceName, FileName, FolderPath
-| order by TimeGenerated asc
-```
+> 💡 The extension is stated in the ransom note found via the Q1 query. 
 
 ---
 
