@@ -13,7 +13,7 @@
 
 ## INCIDENT_BRIEF
 
-Following the initial compromise in *"The Broker"*, a ransomware affiliate returned using pre-staged AnyDesk access. The attacker deployed a new C2 beacon, disabled security controls, dumped credentials, moved laterally to the file server, exfiltrated data, and deployed **Akira ransomware** across two hosts — all within a 3-hour window on January 27, 2026.
+Following the initial compromise in *"The Broker"*, a ransomware affiliate returned using pre-staged AnyDesk access. The attacker deployed a new C2 beacon, disabled security controls, dumped credentials, moved laterally to the file server, exfiltrated data, and deployed **Akira ransomware** across two hosts, all within a 3-hour window on January 27, 2026.
 
 ---
 
