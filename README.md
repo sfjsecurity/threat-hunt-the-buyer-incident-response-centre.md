@@ -238,7 +238,7 @@ DeviceFileEvents
 #### Q11 - Registry Tampering
 **Objective:** Find the registry value used to disable Windows Defender.
 
-**Why It Matters:** The attacker modified the Windows Defender policy registry key — a persistent change that survives process restarts and reboots, ensuring security controls remain disabled.
+**Why It Matters:** The attacker modified the Windows Defender policy registry key - a persistent change that survives process restarts and reboots, ensuring security controls remain disabled.
 
 ```kql
 // Find registry modifications to Windows Defender policy keys
