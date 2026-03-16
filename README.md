@@ -330,7 +330,7 @@ DeviceProcessEvents
 #### Q16 - Suspicious Execution Path
 **Objective:** Identify the unusual directory the remote access tool was running from.
 
-**Why It Matters:** The tool was deliberately placed in a world-writable location accessible to all users — no admin privileges required for execution — making it an ideal persistence staging path.
+**Why It Matters:** The tool was deliberately placed in a world-writable location accessible to all users - no admin privileges required for execution - making it an ideal persistence staging path.
 
 ```kql
 // Find where the remote access tool was installed
@@ -387,7 +387,7 @@ DeviceLogonEvents
 #### Q19 – Primary C2 Beacon
 **Objective:** Identify the new C2 beacon deployed after the previous one failed.
 
-**Why It Matters:** The C2 beacon is the attacker's primary persistence and control mechanism — establishing outbound communications that blend in with normal HTTPS traffic.
+**Why It Matters:** The C2 beacon is the attacker's primary persistence and control mechanism - establishing outbound communications that blend in with normal HTTPS traffic.
 
 ```kql
 // Find suspicious executables created in staging directories
@@ -406,7 +406,7 @@ DeviceFileEvents
 #### Q20 – Beacon Deployment Location
 **Objective:** Identify where the C2 beacon was deployed.
 
-**Why It Matters:** The deployment location reveals the attacker's staging preference — a directory accessible to all users that blends with legitimate application data.
+**Why It Matters:** The deployment location reveals the attacker's staging preference - a directory accessible to all users that blends with legitimate application data.
 
 > 💡 The `FolderPath` column from Q19 contains your answer.
 
@@ -429,14 +429,14 @@ DeviceFileEvents
 | order by TimeGenerated asc
 ```
 
-> 💡 The **first row** returned is the original beacon — its SHA256 is your Q21 answer.
+> 💡 The **first row** returned is the original beacon - its SHA256 is your Q21 answer.
 
 ---
 
 #### Q22 – Replacement Beacon Hash
 **Objective:** Find the SHA256 of the replacement C2 beacon.
 
-**Why It Matters:** A second version was deployed after the first failed, confirming the attacker actively managed their C2 infrastructure — potentially deploying a more stable variant.
+**Why It Matters:** A second version was deployed after the first failed, confirming the attacker actively managed their C2 infrastructure - potentially deploying a more stable variant.
 
 > 💡 Using the same query as Q21 — the **second row** returned is the replacement beacon. Check `DeviceFileEvents` with `ActionType == "FileModified"` if a second `FileCreated` event is not visible.
 
@@ -483,16 +483,16 @@ DeviceFileEvents
 #### Q25 – Scanner Execution Arguments
 **Objective:** Find the arguments passed to the scanner on execution.
 
-**Why It Matters:** The arguments reveal the attacker's intent — running in portable mode leaves no installation footprint, making forensic recovery more difficult.
+**Why It Matters:** The arguments reveal the attacker's intent - running in portable mode leaves no installation footprint, making forensic recovery more difficult.
 
 ```kql
-// Find how the scanner was executed and what arguments were passed
+// Find scanner execution arguments
 DeviceProcessEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
-| where FolderPath contains "Downloads"
-| where FileName endswith ".exe"
-| project TimeGenerated, DeviceName, FileName, ProcessCommandLine
+| where InitiatingProcessFolderPath contains "Downloads"
+    or FolderPath contains "Downloads"
+| project TimeGenerated, DeviceName, FileName, FolderPath, ProcessCommandLine
 | order by TimeGenerated asc
 ```
 
@@ -521,7 +521,7 @@ DeviceProcessEvents
 #### Q27 – Lateral Movement Account
 **Objective:** Find the account used to authenticate to AS-SRV.
 
-**Why It Matters:** The account used for lateral movement was likely obtained from the LSASS memory dump — demonstrating the cascading impact of credential theft earlier in the attack chain.
+**Why It Matters:** The account used for lateral movement was likely obtained from the LSASS memory dump - demonstrating the cascading impact of credential theft earlier in the attack chain.
 
 ```kql
 // Find successful remote logons to AS-SRV
@@ -558,7 +558,7 @@ DeviceProcessEvents
 #### Q29 – Fallback Download Method
 **Objective:** Find the PowerShell cmdlet used as a fallback when the first method failed.
 
-**Why It Matters:** Three different obfuscation techniques were used — base64 encoding, string concatenation, and variable splitting — demonstrating the attacker's adaptability when initial methods encounter issues.
+**Why It Matters:** Three different obfuscation techniques were used - base64 encoding, string concatenation, and variable splitting - demonstrating the attacker's adaptability when initial methods encounter issues.
 
 ```kql
 // Find PowerShell download commands used as fallback
@@ -578,7 +578,7 @@ DeviceEvents
 #### Q30 – Staging Tool
 **Objective:** Find the tool used to compress data before exfiltration.
 
-**Why It Matters:** Data compression before exfiltration is a hallmark of double-extortion ransomware — stolen data gives the attacker two points of leverage over the victim.
+**Why It Matters:** Data compression before exfiltration is a hallmark of double-extortion ransomware - stolen data gives the attacker two points of leverage over the victim.
 
 ```kql
 // Find tools created in staging directories around exfiltration time
@@ -624,7 +624,7 @@ DeviceFileEvents
 #### Q33 – Ransomware Filename
 **Objective:** Find the ransomware binary disguised as a legitimate process.
 
-**Why It Matters:** The ransomware was masqueraded as a common system utility — a technique used to avoid suspicion from users and automated monitoring tools.
+**Why It Matters:** The ransomware was masqueraded as a common system utility - a technique used to avoid suspicion from users and automated monitoring tools.
 
 ```kql
 // Find suspicious executables staged on AS-SRV before encryption
@@ -670,14 +670,13 @@ DeviceFileEvents
 #### Q36 – Recovery Prevention
 **Objective:** Find the command used to delete Volume Shadow Copies.
 
-**Why It Matters:** Deleting VSS prevents victims from restoring encrypted files without paying the ransom — a standard pre-encryption step in modern ransomware deployments.
+**Why It Matters:** Deleting VSS prevents victims from restoring encrypted files without paying the ransom - a standard pre-encryption step in modern ransomware deployments.
 
 ```kql
-// Find shadow copy deletion commands
+// Find all commands executed during the defense evasion phase
 DeviceProcessEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
-| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
-| where FileName has_any ("wmic.exe", "vssadmin.exe", "wbadmin.exe")
+| where TimeGenerated between (datetime(2026-01-27T21:00:00Z) .. datetime(2026-01-27T21:15:00Z))
 | project TimeGenerated, DeviceName, FileName, ProcessCommandLine
 | order by TimeGenerated asc
 ```
@@ -687,15 +686,14 @@ DeviceProcessEvents
 #### Q37 – Ransom Note Origin
 **Objective:** Find the process that dropped the ransom note.
 
-**Why It Matters:** The process that drops the ransom note is the ransomware binary itself executing its encryption and notification routine — confirming the exact binary responsible for impact.
+**Why It Matters:** The process that drops the ransom note is the ransomware binary itself executing its encryption and notification routine - confirming the exact binary responsible for impact.
 
 ```kql
-// Find what process created the ransom note files
 DeviceFileEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
+| where FileName contains "akira"
 | where ActionType == "FileCreated"
-| where FileName contains "readme"
-| project TimeGenerated, DeviceName, FileName, FolderPath, InitiatingProcessFileName
+| project TimeGenerated, DeviceName, FileName, FolderPath, SHA256, InitiatingProcessFileName
 | order by TimeGenerated asc
 ```
 
@@ -706,7 +704,7 @@ DeviceFileEvents
 #### Q38 – Encryption Start Time
 **Objective:** Determine when encryption began.
 
-**Why It Matters:** The first ransom note drop timestamp marks the precise start of encryption — the critical anchor point for the impact phase and recovery team prioritization.
+**Why It Matters:** The first ransom note drop timestamp marks the precise start of encryption - the critical anchor point for the impact phase and recovery team prioritization.
 
 > 💡 The `TimeGenerated` value of the **first** ransom note created (from Q37 query) is your Q38 answer. Format as `HH:MM:SS` UTC.
 
@@ -720,12 +718,10 @@ DeviceFileEvents
 **Why It Matters:** Deleting the ransomware binary after encryption is a deliberate anti-forensics measure designed to prevent incident responders from recovering and analyzing the ransomware sample.
 
 ```kql
-// Find what deleted the ransomware binary
 DeviceFileEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
+| where FileName == "updater.exe"
 | where ActionType == "FileDeleted"
-| where FolderPath contains "ProgramData"
-| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | project TimeGenerated, DeviceName, FileName, FolderPath, InitiatingProcessFileName, InitiatingProcessCommandLine
 | order by TimeGenerated asc
 ```
@@ -740,10 +736,13 @@ DeviceFileEvents
 **Why It Matters:** Understanding the full scope of encryption enables recovery teams to prioritize restoration efforts and ensures no affected systems are missed during remediation.
 
 ```kql
-// Find all hosts where ransomware activity occurred
+// Find all hosts where the C2 implant was deployed
 DeviceFileEvents
+| where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where ActionType == "FileCreated"
-| where FileName contains "readme"
+| where FolderPath contains "ProgramData"
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
+| where FileName endswith ".exe"
 | summarize count() by DeviceName
 | order by count_ desc
 ```
