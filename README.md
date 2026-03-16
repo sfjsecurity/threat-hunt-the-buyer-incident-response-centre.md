@@ -1,10 +1,10 @@
 # Threat Hunt Report: The Buyer
 ### Ashford Sterling Recruitment - Akira Ransomware Investigation
 
-**Analyst:** Sana Jafferi
-**Date Completed:** 2026-03-16
-**Environment Investigated:** AS-PC1, AS-PC2, AS-SRV
-**Timeframe:** January 15 - January 28, 2026
+**Analyst:** Sana Jafferi  
+**Date Completed:** 2026-03-16  
+**Environment Investigated:** AS-PC1, AS-PC2, AS-SRV  
+**Timeframe:** January 15 - January 31, 2026  
 **Platform:** Microsoft Defender for Endpoint + Microsoft Sentinel
 
 ---
