@@ -1,5 +1,5 @@
 # Threat Hunt Report: The Buyer
-### Ashford Sterling Recruitment — Akira Ransomware Investigation
+### Ashford Sterling Recruitment - Akira Ransomware Investigation
 
 **Analyst:** Sana Jafferi
 **Date Completed:** 2026-03-16
@@ -19,7 +19,7 @@ Following the initial compromise investigated in *"The Broker"*, a ransomware af
 
 ## 🎯 Executive Summary
 
-The investigation revealed a multi-stage intrusion spanning two weeks. The threat actor re-entered the environment via pre-staged **AnyDesk** remote access (password: `intrud3r!`) installed during the prior "The Broker" compromise. Using the account `david.mitchell` on **AS-PC2**, the attacker deployed a new C2 implant (`wsync.exe`), disabled Windows Defender via script and registry tampering, dumped LSASS credentials, scanned the internal network, moved laterally to **AS-SRV**, exfiltrated compressed data archives, and finally deployed **Akira ransomware** (`updater.exe`). After encryption, the ransomware binary was deleted via a cleanup script to hinder forensic recovery.
+The investigation revealed a multi-stage intrusion spanning two weeks. The threat actor re-entered the environment via pre-staged **AnyDesk** remote access installed during the prior "The Broker" compromise. Using a compromised account on **AS-PC2**, the attacker deployed a new C2 implant, disabled Windows Defender via script and registry tampering, dumped LSASS credentials, scanned the internal network, moved laterally to **AS-SRV**, exfiltrated compressed data archives, and finally deployed **Akira ransomware**. After encryption, the ransomware binary was deleted via a cleanup script to hinder forensic recovery.
 
 ---
 
@@ -76,56 +76,64 @@ The investigation revealed a multi-stage intrusion spanning two weeks. The threa
 
 ### 🔴 SECTION 1: Ransom Note Analysis
 
-#### Q1 – Threat Actor
+#### Q1 - Threat Actor
 **Objective:** Identify the ransomware group from the ransom note.
 
 **Identified Group:** `Akira`
 
-**Why It Matters:** The ransom note (`akira_readme.txt`) dropped on the file server explicitly identified the Akira ransomware group. Akira is a ransomware-as-a-service (RaaS) operation known for double extortion — encrypting files while threatening to publish stolen data if the ransom is not paid.
+**Why It Matters:** The ransom note dropped on the file server explicitly identified the ransomware group. Akira is a ransomware-as-a-service (RaaS) operation known for double extortion — encrypting files while threatening to publish stolen data if the ransom is not paid.
 
 ```kql
+// Find the ransom note dropped on the file server
 DeviceFileEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
-| where FileName contains "akira"
 | where ActionType == "FileCreated"
+| where FileName contains "readme"
 | project TimeGenerated, DeviceName, FileName, FolderPath
 | order by TimeGenerated asc
 ```
 
 ---
 
-#### Q2 – Negotiation Portal
+#### Q2 - Negotiation Portal
 **Objective:** Find the TOR address from the ransom note.
 
-**Identified Address:** `akiral2iz6a7qgd3ayp3l6yub7xx2uep76idk3u2kollpj5z3z636bad.onion`
+**Why It Matters:** The TOR onion address provides the victim a channel to communicate and negotiate with the attacker. Documenting this is critical for threat intelligence sharing and law enforcement reporting.
 
-**Why It Matters:** The TOR onion address provides the victim a channel to communicate and negotiate with the attacker. Documenting this is critical for threat intelligence sharing, law enforcement reporting, and tracking the specific Akira affiliate responsible.
-
-> ⚠️ Note: The address contains lowercase `l` characters that visually resemble the number `1` — always copy-paste TOR addresses rather than retyping them.
-
----
-
-#### Q3 – Victim ID
-**Objective:** Find the unique victim identifier assigned by Akira.
-
-**Identified ID:** `813R-QWJM-XKIJ`
-
-**Why It Matters:** Each victim receives a unique ID used to identify them in the attacker's negotiation portal. This ID confirms the specific ransomware campaign and can be used to correlate intelligence with other Akira victims.
-
----
-
-#### Q4 – Encrypted Extension
-**Objective:** Identify the file extension appended to encrypted files.
-
-**Identified Extension:** `.akira`
-
-**Why It Matters:** All encrypted files received the `.akira` extension, confirming the ransomware variant and enabling scope assessment of impacted files across the environment.
+> ⚠️ Note: TOR addresses often contain lowercase `l` characters that visually resemble the number `1` — always copy-paste rather than retyping.
 
 ```kql
+// Open the ransom note file identified in Q1 and locate the Contact/TOR section
+DeviceFileEvents
+| where ActionType == "FileCreated"
+| where FileName contains "readme"
+| where DeviceName in ("as-pc1", "as-pc2", "as-srv")
+| project TimeGenerated, DeviceName, FileName, FolderPath
+| order by TimeGenerated asc
+```
+
+---
+
+#### Q3 - Victim ID
+**Objective:** Find the unique victim identifier assigned by the ransomware group.
+
+**Why It Matters:** Each victim receives a unique ID used to identify them in the attacker's negotiation portal. This confirms the specific ransomware campaign and can be used to correlate intelligence with other victims.
+
+> 💡 The victim ID is found in the ransom note — look for the "Your personal ID" field.
+
+---
+
+#### Q4 - Encrypted Extension
+**Objective:** Identify the file extension appended to encrypted files.
+
+**Why It Matters:** Identifying the encrypted extension confirms the ransomware variant and enables scope assessment of impacted files across the environment.
+
+```kql
+// Find encrypted files to identify the new extension
 DeviceFileEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where ActionType == "FileCreated"
-| where FileName endswith ".akira"
+| where FolderPath contains "Shares"
 | project TimeGenerated, DeviceName, FileName, FolderPath
 | order by TimeGenerated asc
 ```
@@ -134,67 +142,71 @@ DeviceFileEvents
 
 ### 🌐 SECTION 2: Infrastructure
 
-#### Q5 – Payload Domain
+#### Q5 - Payload Domain
 **Objective:** Find the domain that hosted attacker tools.
 
-**Identified Domain:** `sync.cloud-endpoint.net`
-
-**Why It Matters:** This attacker-controlled domain hosted all major tooling including `wsync.exe`, `scan.exe`, and `kill.bat`. The attacker used multiple obfuscated PowerShell download cradles — base64 encoding, string concatenation, and variable splitting — to evade string-based detection while downloading from this domain.
+**Why It Matters:** Identifying the payload domain allows defenders to block it at the perimeter and correlate it with other threat intelligence. The attacker used multiple obfuscated PowerShell download cradles to evade string-based detection.
 
 ```kql
-search in (DeviceProcessEvents) "sync.cloud-endpoint.net"
-| project TimeGenerated, DeviceName, FileName, ProcessCommandLine
+// Look for PowerShell download activity and extract the domain
+DeviceEvents
+| where ActionType == "PowerShellCommand"
+| where DeviceName in ("as-pc1", "as-pc2", "as-srv")
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
+| where AdditionalFields contains "IWR" or AdditionalFields contains "WebRequest"
+| project TimeGenerated, DeviceName, AdditionalFields
 | order by TimeGenerated asc
 ```
 
 ---
 
-#### Q6 – Ransomware Staging Domain
+#### Q6 - Ransomware Staging Domain
 **Objective:** Find the separate domain used to stage the ransomware.
 
-**Identified Domain:** `cdn.cloud-endpoint.net`
-
-**Why It Matters:** The attacker used a separate subdomain for ransomware staging, demonstrating disciplined infrastructure separation — a hallmark of organized ransomware affiliates. This separation makes attribution and blocking more complex.
+**Why It Matters:** The attacker used a separate subdomain for ransomware staging, demonstrating disciplined infrastructure separation — a hallmark of organized ransomware affiliates.
 
 ```kql
+// Find outbound connections from the C2 implant
 DeviceNetworkEvents
-| where InitiatingProcessFileName == "wsync.exe"
+| where DeviceName in ("as-pc1", "as-pc2", "as-srv")
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | where RemoteUrl != ""
-| project TimeGenerated, DeviceName, RemoteUrl, RemoteIP, RemotePort
+| where InitiatingProcessFolderPath contains "ProgramData"
+| project TimeGenerated, DeviceName, RemoteUrl, RemoteIP, RemotePort, InitiatingProcessFileName
 | order by TimeGenerated asc
 ```
 
 ---
 
-#### Q7 – C2 IP Addresses
+#### Q7 - C2 IP Addresses
 **Objective:** Find the two IPs resolving to attacker infrastructure.
 
-**Identified IPs:** `104.21.30.237, 172.67.174.46`
-
-**Why It Matters:** Both IPs are Cloudflare-fronted proxies used to mask the real origin server. Both `sync.cloud-endpoint.net` and `cdn.cloud-endpoint.net` resolved to these same IPs, confirming shared backend attacker infrastructure.
+**Why It Matters:** Both IPs are Cloudflare-fronted proxies used to mask the real origin server. Identifying them enables firewall blocking and threat intelligence correlation.
 
 ```kql
+// Summarize IPs contacted by the C2 implant
 DeviceNetworkEvents
-| where InitiatingProcessFileName == "wsync.exe"
-| where RemoteIP != ""
+| where DeviceName in ("as-pc1", "as-pc2", "as-srv")
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
+| where RemoteUrl contains "cloud-endpoint"
 | summarize Domains=make_set(RemoteUrl) by RemoteIP
 ```
 
 ---
 
-#### Q8 – Remote Tool Relay Domain
-**Objective:** Find the specific AnyDesk relay domain used during the attack.
+#### Q8 - Remote Tool Relay Domain
+**Objective:** Find the specific relay domain used by the remote access tool.
 
-**Identified Domain:** `relay-0b975d23.net.anydesk.com`
-
-**Why It Matters:** AnyDesk was pre-staged during "The Broker" intrusion and reused here for persistent remote access. The specific relay domain was identified by filtering `DeviceNetworkEvents` for AnyDesk process connections on the attack date, confirming which session was active during the intrusion window.
+**Why It Matters:** The specific relay domain confirms which session was active during the intrusion window and enables blocking of that specific relay infrastructure.
 
 ```kql
+// Find relay connections made by the remote access tool
 DeviceNetworkEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
-| where InitiatingProcessFileName =~ "anydesk.exe"
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | where RemoteUrl contains "relay"
-| project TimeGenerated, DeviceName, RemoteUrl, RemoteIP
+| where RemoteUrl != ""
+| project TimeGenerated, DeviceName, RemoteUrl, RemoteIP, InitiatingProcessFileName
 | order by TimeGenerated asc
 ```
 
@@ -202,40 +214,51 @@ DeviceNetworkEvents
 
 ### 🛡️ SECTION 3: Defense Evasion
 
-#### Q9 – Evasion Script
+#### Q9 - Evasion Script
 **Objective:** Identify the script used to disable security controls.
 
-**Identified Script:** `kill.bat`
-
-**Why It Matters:** `kill.bat` was created by `wsync.exe` at `C:\ProgramData\kill.bat` and executed via `cmd.exe`. The script disabled multiple Windows Defender components using `Set-MpPreference` commands and modified the registry to permanently disable antivirus protection — clearing the path for ransomware deployment.
+**Why It Matters:** The evasion script disabled multiple Windows Defender components and modified the registry — clearing the path for ransomware deployment. It was created by the C2 implant in a staging directory.
 
 ```kql
+// Find script files created by suspicious processes in staging directories
 DeviceFileEvents
-| where FileName == "kill.bat"
+| where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where ActionType == "FileCreated"
-| project TimeGenerated, DeviceName, FileName, FolderPath, SHA256
+| where FolderPath contains "ProgramData"
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
+| project TimeGenerated, DeviceName, FileName, FolderPath, SHA256, InitiatingProcessFileName
 | order by TimeGenerated asc
 ```
 
 ---
 
-#### Q10 – Evasion Script Hash
-**Objective:** Get the SHA256 of `kill.bat`.
+#### Q10 - Evasion Script Hash
+**Objective:** Get the SHA256 of the evasion script.
 
-**Identified Hash:** `0e7da57d92eaa6bda9d0bbc24b5f0827250aa42f295fd056ded50c6e3c3fb96c`
+**Why It Matters:** The hash enables threat intelligence correlation and supports detection rule creation across security tools.
 
-**Why It Matters:** The hash enables threat intelligence correlation with other Akira affiliate campaigns and supports the creation of detection rules across security tools.
+```kql
+// Use the filename from Q9 to retrieve its hash
+DeviceFileEvents
+| where DeviceName in ("as-pc1", "as-pc2", "as-srv")
+| where ActionType == "FileCreated"
+| where FolderPath contains "ProgramData"
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
+| project TimeGenerated, DeviceName, FileName, FolderPath, SHA256
+| order by TimeGenerated asc
+```
+
+> 💡 The SHA256 column on the same row as your Q9 answer is your Q10 answer.
 
 ---
 
-#### Q11 – Registry Tampering
+#### Q11 - Registry Tampering
 **Objective:** Find the registry value used to disable Windows Defender.
 
-**Identified Value:** `DisableAntiSpyware`
-
-**Why It Matters:** The attacker modified `HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\DisableAntiSpyware` to value `1`, fully disabling antivirus protection via Group Policy registry override — a persistent change that survives process restarts and reboots.
+**Why It Matters:** The attacker modified the Windows Defender policy registry key — a persistent change that survives process restarts and reboots, ensuring security controls remain disabled.
 
 ```kql
+// Find registry modifications to Windows Defender policy keys
 DeviceRegistryEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where RegistryKey contains "Windows Defender"
@@ -246,17 +269,18 @@ DeviceRegistryEvents
 
 ---
 
-#### Q12 – Registry Modification Timestamp
+#### Q12 - Registry Modification Timestamp
 **Objective:** Determine the exact UTC time the registry was modified.
 
-**Identified Time:** `21:03:42`
-
-**Why It Matters:** This timestamp anchors the defense evasion phase in the attack timeline, occurring approximately one hour before ransomware deployment — confirming the deliberate sequencing of the attack.
+**Why It Matters:** This timestamp anchors the defense evasion phase in the attack timeline, confirming the deliberate sequencing of disabling defenses before ransomware deployment.
 
 ```kql
+// Find the exact timestamp of the Defender registry modification
 DeviceRegistryEvents
-| where DeviceName == "as-pc2"
-| where RegistryValueName == "DisableAntiSpyware"
+| where DeviceName in ("as-pc1", "as-pc2", "as-srv")
+| where RegistryKey contains "Windows Defender"
+| where RegistryKey contains "Policies"
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | project TimeGenerated, DeviceName, RegistryKey, RegistryValueName
 | order by TimeGenerated asc
 ```
@@ -265,14 +289,13 @@ DeviceRegistryEvents
 
 ### 🔑 SECTION 4: Credential Access
 
-#### Q13 – Process Hunt
+#### Q13 - Process Hunt
 **Objective:** Find the command used to enumerate processes for credential theft.
 
-**Identified Command:** `tasklist | findstr lsass`
-
-**Why It Matters:** The attacker used `tasklist | findstr lsass` via `cmd.exe` to enumerate running processes and locate `lsass.exe` — the Windows Local Security Authority Subsystem Service. This is a classic pre-credential-dump reconnaissance step to confirm LSASS is running and identify its process ID before memory extraction.
+**Why It Matters:** The attacker enumerated running processes to locate `lsass.exe` before dumping its memory — a classic pre-credential-dump reconnaissance step.
 
 ```kql
+// Find process enumeration commands targeting lsass
 DeviceProcessEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
@@ -283,21 +306,20 @@ DeviceProcessEvents
 
 ---
 
-#### Q14 – Credential Pipe
+#### Q14 - Credential Pipe
 **Objective:** Find the named pipe accessed during credential theft activity.
 
-**Identified Pipe:** `\Device\NamedPipe\lsass`
-
-**Why It Matters:** The named pipe `\Device\NamedPipe\lsass` was accessed during LSASS memory extraction. Named pipes are used internally by credential dumping tools to communicate between processes during memory reads. This confirms the attacker used a tool to extract credential material from LSASS.
+**Why It Matters:** Named pipes are used internally by credential dumping tools during LSASS memory reads. Identifying the pipe confirms the credential theft method used.
 
 ```kql
+// Find named pipe events related to credential access
 DeviceEvents
 | where ActionType == "NamedPipeEvent"
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | extend PipeName = tostring(parse_json(AdditionalFields).PipeName)
-| where PipeName contains "lsass"
-| project TimeGenerated, DeviceName, PipeName, InitiatingProcessFileName
+| where PipeName != ""
+| project TimeGenerated, DeviceName, PipeName, InitiatingProcessFileName, AdditionalFields
 | order by TimeGenerated asc
 ```
 
@@ -305,35 +327,35 @@ DeviceEvents
 
 ### 🚪 SECTION 5: Initial Access
 
-#### Q15 – Remote Access Tool
+#### Q15 - Remote Access Tool
 **Objective:** Identify the remote access tool used to re-enter the environment.
 
-**Identified Tool:** `AnyDesk`
-
-**Why It Matters:** AnyDesk was pre-staged during "The Broker" intrusion and left running at `C:\Users\Public\AnyDesk.exe` with the password `intrud3r!`. The attacker leveraged this pre-staged access to re-enter the environment weeks later without needing to re-exploit — demonstrating the risk of incomplete remediation after an initial breach.
+**Why It Matters:** The remote access tool was pre-staged during the prior "The Broker" intrusion and left running from an unusual path. This highlights the risk of incomplete remediation after an initial breach.
 
 ```kql
+// Find remote access tools running on attack day
 DeviceProcessEvents
-| where DeviceName == "as-pc2"
-| where FileName == "AnyDesk.exe"
+| where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
+| where FolderPath contains "Public"
 | project TimeGenerated, DeviceName, FileName, FolderPath, ProcessCommandLine
 | order by TimeGenerated asc
 ```
 
 ---
 
-#### Q16 – Suspicious Execution Path
-**Objective:** Identify the unusual directory AnyDesk was running from.
+#### Q16 - Suspicious Execution Path
+**Objective:** Identify the unusual directory the remote access tool was running from.
 
-**Identified Path:** `C:\Users\Public`
-
-**Why It Matters:** AnyDesk was deliberately placed in `C:\Users\Public\` rather than its standard installation directory. This location is world-writable and accessible to all users, making it an ideal staging location for persistence tools — no admin privileges required to execute from this path.
+**Why It Matters:** The tool was deliberately placed in a world-writable location accessible to all users — no admin privileges required for execution — making it an ideal persistence staging path.
 
 ```kql
+// Find where the remote access tool was installed
 DeviceFileEvents
-| where FileName == "AnyDesk.exe"
+| where DeviceName in ("as-pc1", "as-pc2", "as-srv")
+| where TimeGenerated between (datetime(2026-01-15) .. datetime(2026-01-16))
 | where ActionType == "FileCreated"
+| where FileName contains "AnyDesk"
 | project TimeGenerated, DeviceName, FileName, FolderPath, SHA256
 | order by TimeGenerated asc
 ```
@@ -341,19 +363,20 @@ DeviceFileEvents
 ---
 
 #### Q17 – Attacker External IP
-**Objective:** Identify the attacker's external IP address.
+**Objective:** Identify the attacker's real external IP address.
 
-**Identified IP:** `88.97.164.155`
-
-**Why It Matters:** This IP appeared consistently in AnyDesk network connections from AS-PC2 during the attack window — including multiple connections at 7:29 PM and 8:12 PM on January 27. This represents the attacker's real external IP routing through the AnyDesk relay infrastructure.
+**Why It Matters:** The attacker's external IP can be blocked at the perimeter and shared with threat intelligence platforms to identify other potential victims.
 
 ```kql
+// Find external IPs connecting through the remote access tool
 DeviceNetworkEvents
-| where DeviceName == "as-pc2"
-| where InitiatingProcessFileName =~ "anydesk.exe"
+| where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
-| project TimeGenerated, DeviceName, RemoteIP, RemoteUrl
-| order by TimeGenerated asc
+| where InitiatingProcessFileName =~ "anydesk.exe"
+| where RemoteIP != ""
+| where RemoteUrl == ""
+| summarize count() by RemoteIP
+| order by count_ desc
 ```
 
 ---
@@ -361,15 +384,15 @@ DeviceNetworkEvents
 #### Q18 – Compromised User
 **Objective:** Identify the user account that was compromised on AS-PC2.
 
-**Identified User:** `david.mitchell`
-
-**Why It Matters:** `david.mitchell` was the active user session on AS-PC2 during the intrusion. This account was used for all attacker activity on the primary attack host, including downloading tools, disabling security controls, and dumping credentials. The account was likely compromised via credential theft during "The Broker" intrusion.
+**Why It Matters:** Identifying the compromised account enables immediate credential reset and scope assessment of what data and systems the attacker could access using that account's privileges.
 
 ```kql
+// Find successful logons to AS-PC2 on attack day
 DeviceLogonEvents
 | where DeviceName == "as-pc2"
 | where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | where ActionType == "LogonSuccess"
+| where LogonType == "RemoteInteractive"
 | project TimeGenerated, DeviceName, AccountName, RemoteIP, LogonType
 | order by TimeGenerated asc
 ```
@@ -381,16 +404,17 @@ DeviceLogonEvents
 #### Q19 – Primary C2 Beacon
 **Objective:** Identify the new C2 beacon deployed after the previous one failed.
 
-**Identified Beacon:** `wsync.exe`
-
-**Why It Matters:** `wsync.exe` was the primary C2 implant for this intrusion, deployed to `C:\ProgramData\wsync.exe`. It established persistent outbound communications to `sync.cloud-endpoint.net` on ports 443 and 80 — blending in with normal HTTPS/HTTP traffic. The original beacon from "The Broker" (`RuntimeBroker.exe`) had failed to maintain stable communications, prompting the attacker to deploy this replacement.
+**Why It Matters:** The C2 beacon is the attacker's primary persistence and control mechanism — establishing outbound communications that blend in with normal HTTPS traffic.
 
 ```kql
+// Find suspicious executables created in staging directories
 DeviceFileEvents
-| where FileName == "wsync.exe"
-| where ActionType == "FileCreated"
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
-| project TimeGenerated, DeviceName, FileName, FolderPath, SHA256
+| where ActionType == "FileCreated"
+| where FolderPath contains "ProgramData"
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
+| where FileName endswith ".exe"
+| project TimeGenerated, DeviceName, FileName, FolderPath, SHA256, InitiatingProcessFileName
 | order by TimeGenerated asc
 ```
 
@@ -399,42 +423,47 @@ DeviceFileEvents
 #### Q20 – Beacon Deployment Location
 **Objective:** Identify where the C2 beacon was deployed.
 
-**Identified Path:** `C:\ProgramData`
+**Why It Matters:** The deployment location reveals the attacker's staging preference — a directory accessible to all users that blends with legitimate application data.
 
-**Why It Matters:** `C:\ProgramData` is a common attacker staging location — it is accessible to all users, not typically monitored by default, and blends in with legitimate application data. Placing malware here reduces suspicion compared to user-specific directories.
+> 💡 The `FolderPath` column from Q19 contains your answer.
 
 ---
 
 #### Q21 – Original Beacon Hash
-**Objective:** Find the SHA256 of the original `wsync.exe` deployment.
+**Objective:** Find the SHA256 of the first version of the C2 beacon.
 
-**Identified Hash:** `66b876c52946f4aed47dd696d790972ff265b6f4451dab54245bc4ef1206d90b`
-
-**Why It Matters:** The first version of `wsync.exe` was deployed at 8:22 PM but failed or was replaced. Having the original hash allows defenders to create detection signatures and correlate this binary with other Akira affiliate intrusions.
+**Why It Matters:** The original beacon hash allows defenders to create detection signatures and correlate this binary with other ransomware affiliate intrusions.
 
 ```kql
+// Find all versions of the C2 beacon created on AS-PC2
 DeviceFileEvents
-| where FileName == "wsync.exe"
 | where DeviceName == "as-pc2"
 | where ActionType == "FileCreated"
+| where FolderPath contains "ProgramData"
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
+| where FileName endswith ".exe"
 | project TimeGenerated, DeviceName, FileName, FolderPath, SHA256
 | order by TimeGenerated asc
 ```
 
+> 💡 The **first row** returned is the original beacon — its SHA256 is your Q21 answer.
+
 ---
 
 #### Q22 – Replacement Beacon Hash
-**Objective:** Find the SHA256 of the replacement `wsync.exe`.
+**Objective:** Find the SHA256 of the replacement C2 beacon.
 
-**Identified Hash:** `0072ca0d0adc9a1b2e1625db4409f57fc32b5a09c414786bf08c4d8e6a073654`
+**Why It Matters:** A second version was deployed after the first failed, confirming the attacker actively managed their C2 infrastructure — potentially deploying a more stable variant.
 
-**Why It Matters:** A second version of `wsync.exe` was deployed at 8:44 PM to replace the failed original. The different hash confirms the attacker actively managed their C2 infrastructure — potentially deploying a more stable or updated implant variant.
+> 💡 Using the same query as Q21 — the **second row** returned is the replacement beacon. Check `DeviceFileEvents` with `ActionType == "FileModified"` if a second `FileCreated` event is not visible.
 
 ```kql
+// Find modified versions of the C2 beacon
 DeviceFileEvents
-| where FileName == "wsync.exe"
 | where DeviceName == "as-pc2"
-| where ActionType in ("FileCreated", "FileModified")
+| where ActionType == "FileModified"
+| where FolderPath contains "ProgramData"
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | project TimeGenerated, DeviceName, FileName, FolderPath, SHA256
 | order by TimeGenerated asc
 ```
@@ -446,13 +475,15 @@ DeviceFileEvents
 #### Q23 – Scanner Tool
 **Objective:** Identify the network scanner deployed by the attacker.
 
-**Identified Tool:** `scan.exe`
-
-**Why It Matters:** `scan.exe` was downloaded from `sync.cloud-endpoint.net` via bitsadmin and placed in `C:\Users\David.Mitchell\Downloads\`. It was used to map the internal network and identify live hosts — feeding the attacker intelligence for lateral movement targeting.
+**Why It Matters:** The scanner was used to map the internal network and identify live hosts — feeding the attacker intelligence for lateral movement targeting.
 
 ```kql
+// Find scanning tools downloaded or created on attack day
 DeviceFileEvents
-| where SHA256 == "26d5748ffe6bd95e3fee6ce184d388a1a681006dc23a0f08d53c083c593c193b"
+| where DeviceName in ("as-pc1", "as-pc2", "as-srv")
+| where ActionType == "FileCreated"
+| where FolderPath contains "Downloads"
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | project TimeGenerated, DeviceName, FileName, FolderPath, SHA256
 | order by TimeGenerated asc
 ```
@@ -462,22 +493,22 @@ DeviceFileEvents
 #### Q24 – Scanner Hash
 **Objective:** Get the SHA256 of the scanner tool.
 
-**Identified Hash:** `26d5748ffe6bd95e3fee6ce184d388a1a681006dc23a0f08d53c083c593c193b`
+> 💡 The `SHA256` column from the Q23 query result is your Q24 answer.
 
 ---
 
 #### Q25 – Scanner Execution Arguments
 **Objective:** Find the arguments passed to the scanner on execution.
 
-**Identified Arguments:** `/portable "C:/Users/david.mitchell/Downloads/" /lng en_us`
-
-**Why It Matters:** The scanner was executed in portable mode from David Mitchell's Downloads folder. Running in portable mode leaves no installation footprint — no registry entries, no start menu shortcuts — making detection and forensic recovery more difficult.
+**Why It Matters:** The arguments reveal the attacker's intent — running in portable mode leaves no installation footprint, making forensic recovery more difficult.
 
 ```kql
+// Find how the scanner was executed and what arguments were passed
 DeviceProcessEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
-| where FileName == "scan.exe"
 | where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
+| where FolderPath contains "Downloads"
+| where FileName endswith ".exe"
 | project TimeGenerated, DeviceName, FileName, ProcessCommandLine
 | order by TimeGenerated asc
 ```
@@ -487,14 +518,15 @@ DeviceProcessEvents
 #### Q26 – Network Share Enumeration
 **Objective:** Find the two internal IPs where network shares were enumerated.
 
-**Identified IPs:** `10.1.0.154, 10.1.0.183`
-
-**Why It Matters:** From AS-SRV, the attacker ran `net view` against AS-PC1 (`10.1.0.154`) and AS-PC2 (`10.1.0.183`) to enumerate accessible network shares — identifying data targets for exfiltration. This confirms deliberate, goal-oriented lateral reconnaissance rather than opportunistic scanning.
+**Why It Matters:** Share enumeration confirms deliberate, goal-oriented lateral reconnaissance — the attacker was identifying specific data targets rather than performing opportunistic scanning.
 
 ```kql
-search in (DeviceProcessEvents) "\\\\10.1.0"
+// Find net view commands used to enumerate shares
+DeviceProcessEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
+| where FileName == "net.exe"
+| where ProcessCommandLine contains "view"
 | project TimeGenerated, DeviceName, FileName, ProcessCommandLine
 | order by TimeGenerated asc
 ```
@@ -504,17 +536,17 @@ search in (DeviceProcessEvents) "\\\\10.1.0"
 ### 🔀 SECTION 8: Lateral Movement
 
 #### Q27 – Lateral Movement Account
-**Objective:** Find the account used to access AS-SRV.
+**Objective:** Find the account used to authenticate to AS-SRV.
 
-**Identified Account:** `as.srv.administrator`
-
-**Why It Matters:** The attacker authenticated to AS-SRV using the local administrator account via RemoteInteractive (RDP) from relay IP `10.0.8.6`. These credentials were almost certainly obtained from the LSASS memory dump performed on AS-PC2 earlier in the attack chain — demonstrating the cascading impact of credential theft.
+**Why It Matters:** The account used for lateral movement was likely obtained from the LSASS memory dump — demonstrating the cascading impact of credential theft earlier in the attack chain.
 
 ```kql
+// Find successful remote logons to AS-SRV
 DeviceLogonEvents
 | where DeviceName == "as-srv"
 | where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | where ActionType == "LogonSuccess"
+| where LogonType == "RemoteInteractive"
 | project TimeGenerated, DeviceName, AccountName, RemoteIP, LogonType
 | order by TimeGenerated asc
 ```
@@ -526,15 +558,14 @@ DeviceLogonEvents
 #### Q28 – First Download Method (LOLBIN)
 **Objective:** Find the first living-off-the-land binary used to download tools.
 
-**Identified Tool:** `bitsadmin.exe`
-
-**Why It Matters:** `bitsadmin.exe` is a native Windows binary that leverages the Background Intelligent Transfer Service (BITS) to silently download files. The attacker used it to download `scan.exe`, `wsync.exe`, and `kill.bat` from `sync.cloud-endpoint.net`. However, `bitsadmin` encountered issues downloading `wsync.exe`, prompting a fallback to PowerShell.
+**Why It Matters:** LOLBins are native Windows tools abused by attackers to download payloads while avoiding detection by security tools that may not flag trusted system binaries.
 
 ```kql
+// Find LOLBin download activity
 DeviceProcessEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
-| where FileName == "bitsadmin.exe"
+| where FileName has_any ("bitsadmin.exe", "certutil.exe", "mshta.exe", "wscript.exe")
 | project TimeGenerated, DeviceName, FileName, ProcessCommandLine
 | order by TimeGenerated asc
 ```
@@ -542,18 +573,17 @@ DeviceProcessEvents
 ---
 
 #### Q29 – Fallback Download Method
-**Objective:** Find the PowerShell cmdlet used as a fallback download method.
+**Objective:** Find the PowerShell cmdlet used as a fallback when the first method failed.
 
-**Identified Cmdlet:** `Invoke-WebRequest`
-
-**Why It Matters:** When `bitsadmin` failed, the attacker switched to PowerShell's `Invoke-WebRequest` (aliased as `IWR`). Three different obfuscation techniques were used to evade detection: base64 encoding, string concatenation, and variable splitting — all resolving to the same download URL.
+**Why It Matters:** Three different obfuscation techniques were used — base64 encoding, string concatenation, and variable splitting — demonstrating the attacker's adaptability when initial methods encounter issues.
 
 ```kql
+// Find PowerShell download commands used as fallback
 DeviceEvents
 | where ActionType == "PowerShellCommand"
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
-| where AdditionalFields contains "WebRequest"
+| where AdditionalFields contains "Uri"
 | project TimeGenerated, DeviceName, AdditionalFields
 | order by TimeGenerated asc
 ```
@@ -563,41 +593,43 @@ DeviceEvents
 ### 📦 SECTION 10: Exfiltration
 
 #### Q30 – Staging Tool
-**Objective:** Find the tool used to compress data for exfiltration.
+**Objective:** Find the tool used to compress data before exfiltration.
 
-**Identified Tool:** `st.exe`
-
-**Why It Matters:** `st.exe` was deployed by `wsync.exe` to `C:\ProgramData\st.exe` and used to create a compressed archive of sensitive data prior to exfiltration. This staging step is common in double-extortion ransomware attacks — data is stolen and compressed before encryption to maximize leverage over the victim.
+**Why It Matters:** Data compression before exfiltration is a hallmark of double-extortion ransomware — stolen data gives the attacker two points of leverage over the victim.
 
 ```kql
+// Find tools created in staging directories around exfiltration time
 DeviceFileEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where ActionType == "FileCreated"
-| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | where FolderPath contains "ProgramData"
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | where FileName endswith ".exe"
-| project TimeGenerated, DeviceName, FileName, FolderPath, SHA256
+| project TimeGenerated, DeviceName, FileName, FolderPath, SHA256, InitiatingProcessFileName
 | order by TimeGenerated asc
 ```
 
 ---
 
 #### Q31 – Staging Tool Hash
-**Identified Hash:** `512a1f4ed9f512572608c729a2b89f44ea66a40433073aedcd914bd2d33b7015`
+**Objective:** Get the SHA256 of the staging tool.
+
+> 💡 The `SHA256` column from the Q30 query result is your Q31 answer.
 
 ---
 
 #### Q32 – Exfiltration Archive
-**Identified Archive:** `exfil_data.zip`
+**Objective:** Find the archive file created for exfiltration.
 
-**Why It Matters:** The archive consolidated stolen data — including files from `C:\Shares\` (Clients, Payroll, Compliance, Contractors) — before transmission. Identifying the filename and hash enables recovery teams to assess the full scope of data loss.
+**Why It Matters:** Identifying the archive filename and hash enables recovery teams to assess the full scope of data loss and potentially recover the archive if found on network storage.
 
 ```kql
+// Find archive files created on attack day
 DeviceFileEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | where ActionType == "FileCreated"
-| where FileName has_any (".zip", ".7z", ".rar")
+| where FileName has_any (".zip", ".7z", ".rar", ".tar")
 | project TimeGenerated, DeviceName, FileName, FolderPath, SHA256
 | order by TimeGenerated asc
 ```
@@ -609,16 +641,15 @@ DeviceFileEvents
 #### Q33 – Ransomware Filename
 **Objective:** Find the ransomware binary disguised as a legitimate process.
 
-**Identified File:** `updater.exe`
-
-**Why It Matters:** The Akira ransomware binary was disguised as a software updater — a common masquerading technique to avoid suspicion from users and automated monitoring tools. It was deployed to `C:\ProgramData\updater.exe` on AS-SRV via PowerShell.
+**Why It Matters:** The ransomware was masqueraded as a common system utility — a technique used to avoid suspicion from users and automated monitoring tools.
 
 ```kql
+// Find suspicious executables staged on AS-SRV before encryption
 DeviceFileEvents
 | where DeviceName == "as-srv"
 | where ActionType == "FileCreated"
-| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | where FolderPath contains "ProgramData"
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | where FileName endswith ".exe"
 | project TimeGenerated, DeviceName, FileName, FolderPath, SHA256, InitiatingProcessFileName
 | order by TimeGenerated asc
@@ -627,40 +658,43 @@ DeviceFileEvents
 ---
 
 #### Q34 – Ransomware Hash
-**Identified Hash:** `e609d070ee9f76934d73353be4ef7ff34b3ecc3a2d1e5d052140ed4cb9e4752b`
+**Objective:** Get the SHA256 of the ransomware binary.
+
+> 💡 The `SHA256` column from the Q33 query result is your Q34 answer.
 
 ---
 
 #### Q35 – Ransomware Staging Process
 **Objective:** Find the process that staged the ransomware on AS-SRV.
 
-**Identified Process:** `powershell.exe`
-
-**Why It Matters:** PowerShell was used to download and write `updater.exe` to disk on AS-SRV, confirming the C2 implant (`wsync.exe`) used PowerShell as its execution engine for staging and deploying the ransomware binary.
+**Why It Matters:** Identifying the staging process confirms how the C2 implant delivered the ransomware and provides a detection opportunity for similar future attacks.
 
 ```kql
+// Find what process created the ransomware binary on AS-SRV
 DeviceFileEvents
 | where DeviceName == "as-srv"
-| where FileName == "updater.exe"
 | where ActionType == "FileCreated"
-| project TimeGenerated, DeviceName, FileName, FolderPath, SHA256, InitiatingProcessFileName, InitiatingProcessCommandLine
+| where FolderPath contains "ProgramData"
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
+| project TimeGenerated, DeviceName, FileName, FolderPath, InitiatingProcessFileName, InitiatingProcessCommandLine
 | order by TimeGenerated asc
 ```
+
+> 💡 The `InitiatingProcessFileName` column on the ransomware row is your Q35 answer.
 
 ---
 
 #### Q36 – Recovery Prevention
 **Objective:** Find the command used to delete Volume Shadow Copies.
 
-**Identified Command:** `wmic shadowcopy delete`
-
-**Why It Matters:** Deleting Volume Shadow Copies prevents victims from restoring encrypted files without paying the ransom. This is standard pre-encryption activity in modern ransomware deployments and is executed as part of `kill.bat` prior to encryption.
+**Why It Matters:** Deleting VSS prevents victims from restoring encrypted files without paying the ransom — a standard pre-encryption step in modern ransomware deployments.
 
 ```kql
+// Find shadow copy deletion commands
 DeviceProcessEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
-| where ProcessCommandLine contains "shadowcopy"
+| where FileName has_any ("wmic.exe", "vssadmin.exe", "wbadmin.exe")
 | project TimeGenerated, DeviceName, FileName, ProcessCommandLine
 | order by TimeGenerated asc
 ```
@@ -670,27 +704,28 @@ DeviceProcessEvents
 #### Q37 – Ransom Note Origin
 **Objective:** Find the process that dropped the ransom note.
 
-**Identified Process:** `updater.exe`
-
-**Why It Matters:** The ransomware binary itself dropped `akira_readme.txt` across multiple directories simultaneously as part of the encryption routine. This confirms automated note deployment and anchors the encryption start time.
+**Why It Matters:** The process that drops the ransom note is the ransomware binary itself executing its encryption and notification routine — confirming the exact binary responsible for impact.
 
 ```kql
+// Find what process created the ransom note files
 DeviceFileEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
-| where FileName contains "akira_readme"
 | where ActionType == "FileCreated"
+| where FileName contains "readme"
 | project TimeGenerated, DeviceName, FileName, FolderPath, InitiatingProcessFileName
 | order by TimeGenerated asc
 ```
+
+> 💡 The `InitiatingProcessFileName` column is your Q37 answer.
 
 ---
 
 #### Q38 – Encryption Start Time
 **Objective:** Determine when encryption began.
 
-**Identified Time (UTC):** `22:18:33`
+**Why It Matters:** The first ransom note drop timestamp marks the precise start of encryption — the critical anchor point for the impact phase and recovery team prioritization.
 
-**Why It Matters:** The first `akira_readme.txt` was dropped at 22:18:33 UTC on January 27, 2026 — marking the precise start of encryption. This timestamp is the critical anchor point for the impact phase of the incident timeline and informs recovery team prioritization.
+> 💡 The `TimeGenerated` value of the **first** ransom note created (from Q37 query) is your Q38 answer. Format as `HH:MM:SS` UTC.
 
 ---
 
@@ -699,32 +734,33 @@ DeviceFileEvents
 #### Q39 – Cleanup Script
 **Objective:** Find the script that deleted the ransomware binary after execution.
 
-**Identified Script:** `clean.bat`
-
-**Why It Matters:** After encryption completed, `cmd.exe /c C:\ProgramData\clean.bat` deleted `updater.exe` to remove the ransomware binary from disk. This deliberate anti-forensics measure was designed to hinder incident responders from recovering and analyzing the ransomware sample.
+**Why It Matters:** Deleting the ransomware binary after encryption is a deliberate anti-forensics measure designed to prevent incident responders from recovering and analyzing the ransomware sample.
 
 ```kql
+// Find what deleted the ransomware binary
 DeviceFileEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
-| where FileName == "updater.exe"
 | where ActionType == "FileDeleted"
+| where FolderPath contains "ProgramData"
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | project TimeGenerated, DeviceName, FileName, FolderPath, InitiatingProcessFileName, InitiatingProcessCommandLine
 | order by TimeGenerated asc
 ```
+
+> 💡 The `InitiatingProcessCommandLine` column reveals the cleanup script name.
 
 ---
 
 #### Q40 – Affected Hosts
 **Objective:** Determine the full scope of compromised hosts.
 
-**Identified Hosts:** `as-pc2, as-srv`
-
-**Why It Matters:** Ransomware was deployed and executed on two hosts. AS-PC2 was the primary attack host (initial access and credential theft) while AS-SRV was the high-value target (file server with sensitive share data). AS-PC1 was used for initial AnyDesk staging but was not encrypted.
+**Why It Matters:** Understanding the full scope of encryption enables recovery teams to prioritize restoration efforts and ensures no affected systems are missed during remediation.
 
 ```kql
+// Find all hosts where ransomware activity occurred
 DeviceFileEvents
-| where FileName contains "akira"
 | where ActionType == "FileCreated"
+| where FileName contains "readme"
 | summarize count() by DeviceName
 | order by count_ desc
 ```
@@ -735,29 +771,29 @@ DeviceFileEvents
 
 | Timestamp (UTC) | Event | Device | Details |
 |----------------|-------|--------|---------|
-| 2026-01-15 04:08 | AnyDesk downloaded | AS-PC1 | `certutil` downloads from `download.anydesk.com` |
-| 2026-01-15 04:10 | AnyDesk installed & password set | AS-PC1 | Password: `intrud3r!`, path: `C:\Users\Public\AnyDesk.exe` |
+| 2026-01-15 04:08 | AnyDesk downloaded | AS-PC1 | Downloaded via `certutil` from AnyDesk CDN |
+| 2026-01-15 04:10 | AnyDesk installed & password set | AS-PC1 | Placed at `C:\Users\Public\AnyDesk.exe` |
 | 2026-01-15 04:41 | AnyDesk deployed to AS-PC2 | AS-PC2 | Lateral deployment via WMI/PsExec |
-| 2026-01-15 04:57 | AnyDesk deployed to AS-SRV | AS-SRV | Full environment coverage |
+| 2026-01-15 04:57 | AnyDesk deployed to AS-SRV | AS-SRV | Full environment coverage achieved |
 | 2026-01-15 04:52 | Credentials dumped (The Broker) | AS-PC2 | SAM/SYSTEM hives saved to `C:\Users\Public\` |
-| 2026-01-27 19:14 | Attacker re-enters via AnyDesk | AS-PC2 | `david.mitchell` logon from `10.0.8.5` |
-| 2026-01-27 19:15 | AnyDesk session established | AS-PC2 | Relay: `relay-0b975d23.net.anydesk.com`, attacker IP: `88.97.164.155` |
-| 2026-01-27 20:17 | `scan.exe` downloaded and executed | AS-PC2 | Network scanner run from Downloads folder |
-| 2026-01-27 20:22 | Original `wsync.exe` deployed | AS-PC2 | C2 implant dropped to `C:\ProgramData\` |
-| 2026-01-27 20:42 | `wsync.exe` re-downloaded (obfuscated) | AS-PC2 | Three obfuscated PowerShell download attempts |
-| 2026-01-27 20:44 | Replacement `wsync.exe` deployed | AS-PC2 | New beacon hash deployed |
-| 2026-01-27 20:45 | LSASS memory dumped | AS-PC2 | `powershell.exe` reads LSASS — 25,864 bytes |
-| 2026-01-27 21:00 | `tasklist \| findstr lsass` run | AS-PC2 | Process enumeration confirming LSASS target |
-| 2026-01-27 21:03 | Defender disabled via `kill.bat` | AS-PC2 | Multiple `Set-MpPreference` + registry tampering |
-| 2026-01-27 21:03 | VSS deleted | AS-PC2 | `wmic shadowcopy delete` prevents recovery |
-| 2026-01-27 21:17 | Network scan performed | AS-PC2 | `scan.exe` maps `10.1.x.x` range |
-| 2026-01-27 22:07 | Lateral movement to AS-SRV | AS-SRV | `as.srv.administrator` RDP from `10.0.8.6` |
-| 2026-01-27 22:14 | `wsync.exe` deployed on AS-SRV | AS-SRV | C2 implant dropped via PowerShell |
-| 2026-01-27 22:15 | `updater.exe` staged on AS-SRV | AS-SRV | Ransomware binary written by `powershell.exe` |
-| 2026-01-27 22:17 | Share enumeration from AS-SRV | AS-SRV | `net view \\10.1.0.154` and `net view \\10.1.0.183` |
-| 2026-01-27 22:18 | `st.exe` compresses data | AS-SRV | `exfil_data.zip` created for exfiltration |
-| 2026-01-27 22:18:33 | Encryption begins | AS-SRV | `updater.exe` executes, drops `akira_readme.txt` |
-| 2026-01-27 22:20 | Ransomware binary deleted | AS-SRV | `clean.bat` deletes `updater.exe` |
+| 2026-01-27 19:14 | Attacker re-enters via AnyDesk | AS-PC2 | `david.mitchell` logon from Guacamole relay |
+| 2026-01-27 19:15 | AnyDesk session established | AS-PC2 | Relay: `relay-0b975d23.net.anydesk.com` |
+| 2026-01-27 20:17 | Scanner downloaded and executed | AS-PC2 | Network scanner run from Downloads folder |
+| 2026-01-27 20:22 | Original C2 beacon deployed | AS-PC2 | First `wsync.exe` dropped to `C:\ProgramData\` |
+| 2026-01-27 20:42 | C2 beacon re-downloaded (obfuscated) | AS-PC2 | Three obfuscated PowerShell download attempts |
+| 2026-01-27 20:44 | Replacement C2 beacon deployed | AS-PC2 | Second `wsync.exe` with different hash |
+| 2026-01-27 20:45 | LSASS memory dumped | AS-PC2 | Credential extraction via named pipe |
+| 2026-01-27 21:00 | Process enumeration for LSASS | AS-PC2 | `tasklist \| findstr lsass` |
+| 2026-01-27 21:03 | Defender disabled via evasion script | AS-PC2 | `kill.bat` — `Set-MpPreference` + registry |
+| 2026-01-27 21:03 | VSS deleted | AS-PC2 | Shadow copies removed to prevent recovery |
+| 2026-01-27 21:17 | Network scan performed | AS-PC2 | Internal range mapped for lateral targets |
+| 2026-01-27 22:07 | Lateral movement to AS-SRV | AS-SRV | Administrator RDP from relay IP |
+| 2026-01-27 22:14 | C2 beacon deployed on AS-SRV | AS-SRV | Implant dropped via PowerShell |
+| 2026-01-27 22:15 | Ransomware staged on AS-SRV | AS-SRV | Disguised binary written by PowerShell |
+| 2026-01-27 22:17 | Share enumeration from AS-SRV | AS-SRV | `net view` against internal workstations |
+| 2026-01-27 22:18 | Data compressed for exfiltration | AS-SRV | Archive created from sensitive shares |
+| 2026-01-27 22:18:33 | Encryption begins | AS-SRV | Ransomware executes, drops ransom notes |
+| 2026-01-27 22:20 | Ransomware binary deleted | AS-SRV | Cleanup script removes evidence |
 
 ---
 
@@ -775,7 +811,6 @@ DeviceFileEvents
 | Ransomware Binary | `updater.exe` — SHA256: `e609d070ee9f76934d73353be4ef7ff34b3ecc3a2d1e5d052140ed4cb9e4752b` |
 | Initial Payload | `daniel_richardson_cv.pdf.exe` |
 | Persistence Tool | `AnyDesk.exe` — `C:\Users\Public\AnyDesk.exe` |
-| AnyDesk Password | `intrud3r!` |
 | AnyDesk Relay | `relay-0b975d23.net.anydesk.com` |
 | Evasion Script | `kill.bat` — SHA256: `0e7da57d92eaa6bda9d0bbc24b5f0827250aa42f295fd056ded50c6e3c3fb96c` |
 | Cleanup Script | `clean.bat` — `C:\ProgramData\clean.bat` |
@@ -794,24 +829,24 @@ DeviceFileEvents
 
 | Tactic | Technique | Tool/Method |
 |--------|-----------|-------------|
-| Initial Access | T1204 – User Execution | `daniel_richardson_cv.pdf.exe` double extension payload |
-| Persistence | T1219 – Remote Access Software | AnyDesk pre-staged at `C:\Users\Public\` with password |
-| Persistence | T1053.005 – Scheduled Task | `MicrosoftEdgeUpdateCheck` running `RuntimeBroker.exe` |
-| Execution | T1059.001 – PowerShell | Download cradles with bypass flags and obfuscation |
-| Execution | T1105 – Ingress Tool Transfer | `bitsadmin.exe` for LOLBin tool download |
-| Defense Evasion | T1562.001 – Disable Security Tools | `kill.bat` — multiple `Set-MpPreference` + registry |
+| Initial Access | T1204 – User Execution | Double extension payload from prior intrusion |
+| Persistence | T1219 – Remote Access Software | AnyDesk pre-staged at `C:\Users\Public\` |
+| Persistence | T1053.005 – Scheduled Task | `MicrosoftEdgeUpdateCheck` from prior intrusion |
+| Execution | T1059.001 – PowerShell | Obfuscated download cradles (base64, string concat, variable split) |
+| Execution | T1105 – Ingress Tool Transfer | `bitsadmin.exe` LOLBin for tool download |
+| Defense Evasion | T1562.001 – Disable Security Tools | Evasion script disabling multiple Defender components |
 | Defense Evasion | T1112 – Modify Registry | `DisableAntiSpyware` registry key modification |
-| Defense Evasion | T1036 – Masquerading | `updater.exe` disguised as software updater |
-| Defense Evasion | T1027 – Obfuscated Files | Base64, string concat, variable splitting for downloads |
-| Credential Access | T1003.001 – LSASS Memory | `powershell.exe` reads LSASS — `\Device\NamedPipe\lsass` |
-| Discovery | T1046 – Network Service Scanning | `scan.exe` maps internal `10.1.x.x` range |
-| Discovery | T1135 – Network Share Discovery | `net view \\10.1.0.154`, `net view \\10.1.0.183` |
-| Lateral Movement | T1021.001 – Remote Desktop | `as.srv.administrator` RDP to AS-SRV |
-| Collection | T1560 – Archive Collected Data | `st.exe` → `exfil_data.zip` |
-| Exfiltration | T1041 – Exfiltration Over C2 | Data exfiltrated via `wsync.exe` C2 channel |
-| Impact | T1486 – Data Encrypted for Impact | Akira ransomware — `.akira` extension |
-| Impact | T1490 – Inhibit System Recovery | `wmic shadowcopy delete` removes VSS copies |
-| Impact | T1485 – Data Destruction | `clean.bat` deletes ransomware binary post-encryption |
+| Defense Evasion | T1036 – Masquerading | Ransomware disguised as software updater |
+| Defense Evasion | T1027 – Obfuscated Files | Multiple obfuscation techniques for downloads |
+| Credential Access | T1003.001 – LSASS Memory | LSASS memory dump via named pipe |
+| Discovery | T1046 – Network Service Scanning | Internal network scanner mapping `10.1.x.x` range |
+| Discovery | T1135 – Network Share Discovery | `net view` enumerating shares on internal hosts |
+| Lateral Movement | T1021.001 – Remote Desktop | RDP using harvested administrator credentials |
+| Collection | T1560 – Archive Collected Data | Staging tool compressing sensitive share data |
+| Exfiltration | T1041 – Exfiltration Over C2 | Data exfiltrated via C2 implant channel |
+| Impact | T1486 – Data Encrypted for Impact | Akira ransomware with `.akira` extension |
+| Impact | T1490 – Inhibit System Recovery | VSS deletion preventing file restoration |
+| Impact | T1485 – Data Destruction | Cleanup script deletes ransomware binary post-encryption |
 
 ---
 
@@ -819,10 +854,10 @@ DeviceFileEvents
 
 | Feature | Details |
 |---------|---------|
-| **Adversary** | Akira ransomware affiliate — hands-on-keyboard operator demonstrating patient, multi-phase methodology. Re-used pre-staged access from a prior intrusion ("The Broker"), showing operational maturity and awareness of the victim environment. |
-| **Infrastructure** | Attacker-controlled: `sync.cloud-endpoint.net`, `cdn.cloud-endpoint.net` (Cloudflare-fronted, IPs: `104.21.30.237`, `172.67.174.46`). Remote access relay: `relay-0b975d23.net.anydesk.com`. Guacamole RDP gateways: `10.0.8.5`, `10.0.8.6`, `10.0.8.8`. Attacker external IP: `88.97.164.155`. |
-| **Capability** | C2 beacon (`wsync.exe`), AnyDesk for persistent remote access (pre-staged), credential dumping via LSASS named pipe, network scanning (`scan.exe`), defense evasion scripts (`kill.bat`), data staging (`st.exe`), Akira ransomware (`updater.exe`), cleanup script (`clean.bat`). |
-| **Victim** | Primary: AS-PC2 (entry point via `david.mitchell`). Lateral target: AS-SRV (via `as.srv.administrator`). Encrypted: AS-PC2 and AS-SRV. Targeted shares: `C:\Shares\` — Clients, Payroll, Compliance, Contractors, Backups. |
+| **Adversary** | Akira ransomware affiliate — hands-on-keyboard operator demonstrating patient, multi-phase methodology. Re-used pre-staged access from a prior intrusion, showing operational maturity and deep awareness of the victim environment. |
+| **Infrastructure** | Attacker-controlled: `sync.cloud-endpoint.net`, `cdn.cloud-endpoint.net` (Cloudflare-fronted). Remote access relay: `relay-0b975d23.net.anydesk.com`. Guacamole RDP gateways: `10.0.8.5`, `10.0.8.6`, `10.0.8.8`. Attacker external IP: `88.97.164.155`. |
+| **Capability** | C2 beacon (`wsync.exe`), AnyDesk for persistent remote access, LSASS credential dumping via named pipe, network scanning, defense evasion scripts, data staging and compression, Akira ransomware, anti-forensics cleanup. |
+| **Victim** | Primary: AS-PC2 (entry point). Lateral target: AS-SRV (file server). Encrypted hosts: AS-PC2 and AS-SRV. Targeted shares: `C:\Shares\` — Clients, Payroll, Compliance, Contractors, Backups. |
 
 ---
 
@@ -832,26 +867,26 @@ The Ashford Sterling Recruitment intrusion represents a sophisticated, patient, 
 
 The attack chain progressed methodically: re-entry via AnyDesk → C2 establishment → credential theft → network reconnaissance → lateral movement → data exfiltration → ransomware deployment → anti-forensics cleanup — all within a few hours on January 27, 2026.
 
-The most critical lesson from this incident is that **incomplete remediation after the initial "The Broker" compromise directly enabled this attack**. Had AnyDesk been removed and all credentials reset after the first intrusion, the attacker would have had no pre-staged access to leverage.
+The most critical lesson: **incomplete remediation after the initial "The Broker" compromise directly enabled this attack.** Had AnyDesk been removed and all credentials reset, the attacker would have had no pre-staged access to leverage.
 
 ---
 
 ## 🧠 Lessons Learned
 
 **Pre-Staged Access Is the Hardest Threat to Detect**
-The attacker's ability to return months later using pre-installed AnyDesk highlights the critical risk of incomplete post-incident remediation.
+The attacker returned months later using pre-installed tooling — highlighting the critical risk of incomplete post-incident remediation.
 
 **Obfuscated Download Cradles Evade Simple Detection**
-Three different obfuscation methods were used for a single download — emphasizing the need for behavioral rather than signature-based detection.
+Three different obfuscation methods were used for a single download — behavioral detection is essential, not just signature-based.
 
 **Legitimate Tools Are the Preferred Attack Vector**
-Every major stage used legitimate software: AnyDesk, bitsadmin, scan.exe, wmic. LOLBin behavioral monitoring is essential.
+Every major stage used legitimate software: AnyDesk, bitsadmin, net.exe, wmic. LOLBin behavioral monitoring is non-negotiable.
 
 **Speed of Execution Limits Response Time**
 From re-entry to encryption took approximately 3 hours — leaving a narrow window for detection and containment.
 
 **Credential Theft Has Long-Term Consequences**
-Credentials harvested during "The Broker" were reused in this attack for lateral movement — demonstrating the cascading impact of uncontained credential compromise.
+Credentials harvested in the prior intrusion were reused for lateral movement — demonstrating the cascading impact of uncontained credential compromise.
 
 **Double Extortion Increases Victim Pressure**
 Data was exfiltrated before encryption, giving the attacker two points of leverage: file recovery and threat of data publication.
@@ -862,23 +897,23 @@ Data was exfiltrated before encryption, giving the attacker two points of levera
 
 **Immediate:**
 - Isolate AS-PC2 and AS-SRV from the network
-- Reset credentials for `david.mitchell` and `as.srv.administrator`
+- Reset all credentials for compromised accounts
 - Remove `C:\Users\Public\AnyDesk.exe` from all hosts
 - Delete scheduled task `MicrosoftEdgeUpdateCheck` on all hosts
 - Block `sync.cloud-endpoint.net` and `cdn.cloud-endpoint.net` at firewall/proxy
-- Block `88.97.164.155` at perimeter firewall
+- Block attacker external IP at perimeter firewall
 
 **Short Term:**
-- Enforce AnyDesk block policy — restrict to IT-approved remote tools only
+- Enforce policy restricting remote tools to IT-approved applications only
 - Enable PowerShell Script Block Logging and AMSI on all endpoints
-- Alert on `bitsadmin.exe` and `certutil.exe` making network connections
-- Monitor for `Set-MpPreference` and registry modifications to Windows Defender keys
-- Implement privileged account monitoring for local administrator accounts
-- Hunt for `wsync.exe` or unknown executables in `C:\ProgramData\` across all endpoints
+- Alert on LOLBin network activity (`bitsadmin.exe`, `certutil.exe`)
+- Monitor for `Set-MpPreference` and Windows Defender registry modifications
+- Implement privileged account monitoring for all local administrator accounts
+- Hunt for unknown executables in `C:\ProgramData\` across all endpoints
 
 **Long Term:**
 - Enforce MFA for all RDP and remote access sessions
-- Implement network segmentation to limit lateral movement from workstations to servers
+- Implement network segmentation to limit lateral movement
 - Deploy honeypot files in share directories to detect early ransomware activity
 - Conduct full forensic review of "The Broker" intrusion to ensure complete remediation
 - Establish immutable off-site backups to enable recovery without ransom payment
