@@ -13,7 +13,7 @@
 
 ## INCIDENT_BRIEF
 
-Following the initial compromise in *"The Broker"*, a ransomware affiliate returned using pre-staged AnyDesk access. The attacker deployed a new C2 beacon, disabled security controls, dumped credentials, moved laterally to the file server, exfiltrated data, and deployed **Akira ransomware** across two hosts, all within a 3-hour window on January 27, 2026.
+Following the initial compromise in *"The Broker"*, a ransomware affiliate returned using pre-staged AnyDesk access. The attacker deployed a new C2 beacon, disabled security controls, dumped credentials, moved laterally to the file server, exfiltrated data, and deployed **Akira ransomware** across two hosts - all within a 3-hour window on January 27, 2026.
 
 ---
 
@@ -48,22 +48,22 @@ Jan 27  ──► 19:14  Re-entry via AnyDesk (david.mitchell / AS-PC2)
 
 ---
 
-## CTF_CHAPTERS
+## INVESTIGATION_CHAPTERS
 
 | Chapter | Name | Flags | Focus |
 |---------|------|-------|-------|
-| 1 | Ransom Note Analysis | Q1-Q4 | Ransomware identification and victim details |
-| 2 | Infrastructure | Q5-Q8 | C2 domains, IPs, and remote access relay |
-| 3 | Defense Evasion | Q9-Q12 | Security bypass and registry tampering |
-| 4 | Credential Access | Q13-Q14 | LSASS dumping and named pipe access |
-| 5 | Initial Access | Q15-Q18 | Re-entry via pre-staged remote tool |
-| 6 | Command & Control | Q19-Q22 | C2 beacon deployment and versioning |
-| 7 | Reconnaissance | Q23-Q26 | Network scanning and share enumeration |
+| 1 | Ransom Note Analysis | Q1–Q4 | Ransomware identification and victim details |
+| 2 | Infrastructure | Q5–Q8 | C2 domains, IPs, and remote access relay |
+| 3 | Defense Evasion | Q9–Q12 | Security bypass and registry tampering |
+| 4 | Credential Access | Q13–Q14 | LSASS dumping and named pipe access |
+| 5 | Initial Access | Q15–Q18 | Re-entry via pre-staged remote tool |
+| 6 | Command & Control | Q19–Q22 | C2 beacon deployment and versioning |
+| 7 | Reconnaissance | Q23–Q26 | Network scanning and share enumeration |
 | 8 | Lateral Movement | Q27 | Credential-based pivot to file server |
-| 9 | Tool Transfer | Q28-Q29 | LOLBin abuse and PowerShell downloads |
-| 10 | Exfiltration | Q30-Q32 | Data staging and archive creation |
+| 9 | Tool Transfer | Q28–Q29 | LOLBin abuse and PowerShell downloads |
+| 10 | Exfiltration | Q30–Q32 | Data staging and archive creation |
 | 11 | Ransomware Deployment | Q33–Q38 | Execution, encryption, and ransom note |
-| 12 | Anti-Forensics & Scope | Q39-Q40 | Cleanup and compromised host scope |
+| 12 | Anti-Forensics & Scope | Q39–Q40 | Cleanup and compromised host scope |
 
 ---
 
@@ -140,7 +140,7 @@ Jan 27  ──► 19:14  Re-entry via AnyDesk (david.mitchell / AS-PC2)
 #### Q1 - Threat Actor
 **Objective:** Identify the ransomware group from the ransom note.
 
-**Why It Matters:** Akira is a RaaS operation known for double extortion — encrypting files while threatening to publish stolen data.
+**Why It Matters:** Akira is a RaaS operation known for double extortion - encrypting files while threatening to publish stolen data.
 
 `T1486 Data Encrypted` `DeviceFileEvents` `Ransom Note Analysis`
 
@@ -155,7 +155,7 @@ DeviceFileEvents
 | order by TimeGenerated asc
 ```
 
-> 💡 Open the file at the path shown in `FolderPath` — Q1 through Q4 are all answered by reading the ransom note.
+> 💡 Open the file at the path shown in `FolderPath` - Q1 through Q4 are all answered by reading the ransom note.
 
 ---
 
@@ -166,8 +166,8 @@ DeviceFileEvents
 
 `T1486 Data Encrypted` `Ransom Note Analysis`
 
-> 💡 No query needed — open the ransom note from Q1 and find the **Contact** section.
-> ⚠️ Always copy-paste TOR addresses — lowercase `l` and number `1` look identical.
+> 💡 No query needed - open the ransom note from Q1 and find the **Contact** section.
+> ⚠️ Always copy-paste TOR addresses - lowercase `l` and number `1` look identical.
 
 ---
 
@@ -178,7 +178,7 @@ DeviceFileEvents
 
 `T1486 Data Encrypted` `Ransom Note Analysis`
 
-> 💡 No query needed — find the **Your personal ID:** field in the ransom note from Q1.
+> 💡 No query needed - find the **Your personal ID:** field in the ransom note from Q1.
 
 ---
 
@@ -232,7 +232,7 @@ DeviceProcessEvents
 #### Q6 - Ransomware Staging Domain
 **Objective:** Find the separate domain used to stage the ransomware.
 
-**Why It Matters:** Separate staging infrastructure demonstrates disciplined tradecraft — a hallmark of organized ransomware affiliates.
+**Why It Matters:** Separate staging infrastructure demonstrates disciplined tradecraft - a hallmark of organized ransomware affiliates.
 
 `T1071 Application Layer Protocol` `DeviceNetworkEvents` `Infrastructure Analysis`
 
@@ -300,7 +300,7 @@ DeviceNetworkEvents
 #### Q9 - Evasion Script
 **Objective:** Identify the script used to disable security controls.
 
-**Why It Matters:** The script disabled multiple Defender components and modified the registry — created by the C2 implant before ransomware deployment.
+**Why It Matters:** The script disabled multiple Defender components and modified the registry - created by the C2 implant before ransomware deployment.
 
 `T1562.001 Impair Defenses` `DeviceFileEvents` `Defense Evasion`
 
@@ -315,7 +315,7 @@ DeviceFileEvents
 | order by TimeGenerated asc
 ```
 
-> 💡 The evasion script was created on the initial workstation, not the server. Look at `InitiatingProcessFileName` — scripts created by suspicious processes stand out.
+> 💡 The evasion script was created on the initial workstation, not the server. Look at `InitiatingProcessFileName` - scripts created by suspicious processes stand out.
 
 ---
 
@@ -333,7 +333,7 @@ DeviceFileEvents
 #### Q11 - Registry Tampering
 **Objective:** Find the registry value used to disable Windows Defender.
 
-**Why It Matters:** A policy registry change that survives reboots — more persistent than a process-level disable.
+**Why It Matters:** A policy registry change that survives reboots - more persistent than a process-level disable.
 
 `T1112 Modify Registry` `DeviceRegistryEvents` `Defense Evasion`
 
@@ -354,7 +354,7 @@ DeviceRegistryEvents
 #### Q12 - Registry Timestamp
 **Objective:** Find the exact UTC time the registry was modified.
 
-**Why It Matters:** Anchors the defense evasion phase — this timestamp also helps find Q36.
+**Why It Matters:** Anchors the defense evasion phase - this timestamp also helps find Q36.
 
 `T1112 Modify Registry` `DeviceRegistryEvents` `Timeline Analysis`
 
@@ -369,7 +369,7 @@ DeviceRegistryEvents
 | order by TimeGenerated asc
 ```
 
-> 💡 Format `TimeGenerated` as `HH:MM:SS` UTC — drop the date and milliseconds.
+> 💡 Format `TimeGenerated` as `HH:MM:SS` UTC - drop the date and milliseconds.
 
 ---
 
@@ -438,7 +438,7 @@ DeviceProcessEvents
 | order by TimeGenerated asc
 ```
 
-> 💡 The unusual `FolderPath` is the red flag — the `FileName` is your answer.
+> 💡 The unusual `FolderPath` is the red flag - the `FileName` is your answer.
 
 ---
 
@@ -562,14 +562,14 @@ DeviceFileEvents
 | order by TimeGenerated asc
 ```
 
-> 💡 The **first row** is the original beacon — its `SHA256` is your answer.
+> 💡 The **first row** is the original beacon - its `SHA256` is your answer.
 
 ---
 
 #### Q22 - Replacement Beacon Hash
 **Objective:** Find the SHA256 of the replacement beacon.
 
-**Why It Matters:** Different hash confirms the attacker actively managed C2 — deploying a more stable variant.
+**Why It Matters:** Different hash confirms the attacker actively managed C2 - deploying a more stable variant.
 
 `T1071 Application Layer Protocol` `DeviceFileEvents` `Malware Identification`
 
@@ -584,7 +584,7 @@ DeviceFileEvents
 | order by TimeGenerated asc
 ```
 
-> 💡 The replacement appears as a `FileModified` event — its `SHA256` is your answer.
+> 💡 The replacement appears as a `FileModified` event - its `SHA256` is your answer.
 
 ---
 
@@ -624,7 +624,7 @@ DeviceFileEvents
 #### Q25 - Scanner Execution Arguments
 **Objective:** Find the arguments passed to the scanner.
 
-**Why It Matters:** Portable mode leaves no installation footprint — deliberate evasion.
+**Why It Matters:** Portable mode leaves no installation footprint - deliberate evasion.
 
 `T1046 Network Service Scanning` `DeviceProcessEvents` `Discovery`
 
@@ -714,7 +714,7 @@ DeviceProcessEvents
 #### Q29 - Fallback Download Method
 **Objective:** Find the PowerShell cmdlet used when the first method failed.
 
-**Why It Matters:** Three obfuscation techniques used - base64, string concat, variable splitting — showing attacker adaptability.
+**Why It Matters:** Three obfuscation techniques used - base64, string concat, variable splitting - showing attacker adaptability.
 
 `T1059.001 PowerShell` `DeviceEvents` `Tool Transfer`
 
@@ -729,7 +729,7 @@ DeviceEvents
 | order by TimeGenerated asc
 ```
 
-> 💡 The alias `IWR` in `AdditionalFields` stands for the full cmdlet name — that's your answer.
+> 💡 The alias `IWR` in `AdditionalFields` stands for the full cmdlet name - that's your answer.
 
 ---
 
@@ -754,7 +754,7 @@ DeviceFileEvents
 | order by TimeGenerated asc
 ```
 
-> 💡 Look for a short, non-descriptive executable — that's the staging tool.
+> 💡 Look for a short, non-descriptive executable - that's the staging tool.
 
 ---
 
@@ -819,7 +819,7 @@ DeviceFileEvents
 
 `T1486 Data Encrypted` `DeviceFileEvents` `Malware Identification`
 
-> 💡 Same query as Q33 — the `SHA256` on the ransomware row is your answer.
+> 💡 Same query as Q33 - the `SHA256` on the ransomware row is your answer.
 
 ---
 
@@ -890,11 +890,11 @@ DeviceFileEvents
 #### Q38 - Encryption Start Time
 **Objective:** Determine when encryption began.
 
-**Why It Matters:** Anchors the impact phase — critical for recovery team prioritization.
+**Why It Matters:** Anchors the impact phase - critical for recovery team prioritization.
 
 `T1486 Data Encrypted` `DeviceFileEvents` `Timeline Analysis`
 
-> 💡 Same query as Q37 — `TimeGenerated` of the **first row** is your answer. Format as `HH:MM:SS` UTC.
+> 💡 Same query as Q37 - `TimeGenerated` of the **first row** is your answer. Format as `HH:MM:SS` UTC.
 
 ---
 
@@ -952,16 +952,16 @@ DeviceFileEvents
 | C2 IP | `104.21.30.237` |
 | C2 IP | `172.67.174.46` |
 | Attacker External IP | `88.97.164.155` |
-| C2 Beacon (original) | `wsync.exe` — `66b876c52946f4aed47dd696d790972ff265b6f4451dab54245bc4ef1206d90b` |
-| C2 Beacon (replacement) | `wsync.exe` — `0072ca0d0adc9a1b2e1625db4409f57fc32b5a09c414786bf08c4d8e6a073654` |
-| Ransomware Binary | `updater.exe` — `e609d070ee9f76934d73353be4ef7ff34b3ecc3a2d1e5d052140ed4cb9e4752b` |
-| Persistence Tool | `AnyDesk.exe` — `C:\Users\Public\AnyDesk.exe` |
+| C2 Beacon (original) | `wsync.exe` - `66b876c52946f4aed47dd696d790972ff265b6f4451dab54245bc4ef1206d90b` |
+| C2 Beacon (replacement) | `wsync.exe` - `0072ca0d0adc9a1b2e1625db4409f57fc32b5a09c414786bf08c4d8e6a073654` |
+| Ransomware Binary | `updater.exe` - `e609d070ee9f76934d73353be4ef7ff34b3ecc3a2d1e5d052140ed4cb9e4752b` |
+| Persistence Tool | `AnyDesk.exe` - `C:\Users\Public\AnyDesk.exe` |
 | AnyDesk Relay | `relay-0b975d23.net.anydesk.com` |
-| Evasion Script | `kill.bat` — `0e7da57d92eaa6bda9d0bbc24b5f0827250aa42f295fd056ded50c6e3c3fb96c` |
-| Cleanup Script | `clean.bat` — `C:\ProgramData\clean.bat` |
-| Staging Tool | `st.exe` — `512a1f4ed9f512572608c729a2b89f44ea66a40433073aedcd914bd2d33b7015` |
+| Evasion Script | `kill.bat` - `0e7da57d92eaa6bda9d0bbc24b5f0827250aa42f295fd056ded50c6e3c3fb96c` |
+| Cleanup Script | `clean.bat` - `C:\ProgramData\clean.bat` |
+| Staging Tool | `st.exe` - `512a1f4ed9f512572608c729a2b89f44ea66a40433073aedcd914bd2d33b7015` |
 | Exfil Archive | `exfil_data.zip` |
-| Scanner Tool | `scan.exe` — `26d5748ffe6bd95e3fee6ce184d388a1a681006dc23a0f08d53c083c593c193b` |
+| Scanner Tool | `scan.exe` - `26d5748ffe6bd95e3fee6ce184d388a1a681006dc23a0f08d53c083c593c193b` |
 | Compromised Account | `david.mitchell` |
 | Compromised Account | `as.srv.administrator` |
 | TOR Address | `akiral2iz6a7qgd3ayp3l6yub7xx2uep76idk3u2kollpj5z3z636bad.onion` |
@@ -973,7 +973,7 @@ DeviceFileEvents
 
 | Feature | Details |
 |---------|---------|
-| **Adversary** | Akira ransomware affiliate — hands-on-keyboard, patient, multi-phase. Re-used pre-staged access from a prior intrusion. |
+| **Adversary** | Akira ransomware affiliate - hands-on-keyboard, patient, multi-phase. Re-used pre-staged access from a prior intrusion. |
 | **Infrastructure** | `sync.cloud-endpoint.net`, `cdn.cloud-endpoint.net` (Cloudflare-fronted). Relay: `relay-0b975d23.net.anydesk.com`. Attacker IP: `88.97.164.155`. |
 | **Capability** | `wsync.exe` C2, AnyDesk persistence, LSASS dumping, network scanning, defense evasion, data staging, Akira ransomware, anti-forensics cleanup. |
 | **Victim** | Entry: AS-PC2 (`david.mitchell`). Lateral: AS-SRV (`as.srv.administrator`). Encrypted: AS-PC2, AS-SRV. Shares: Clients, Payroll, Compliance, Contractors, Backups. |
@@ -986,11 +986,11 @@ DeviceFileEvents
 
 **Obfuscation Defeats Signature Detection** - Three download methods for a single payload; behavioral monitoring is essential.
 
-**Legitimate Tools Are the Weapon** — AnyDesk, bitsadmin, net.exe, wmic. LOLBin monitoring is non-negotiable.
+**Legitimate Tools Are the Weapon** - AnyDesk, bitsadmin, net.exe, wmic. LOLBin monitoring is non-negotiable.
 
-**3-Hour Window from Entry to Encryption** — Speed of execution leaves minimal time for detection and response.
+**3-Hour Window from Entry to Encryption** - Speed of execution leaves minimal time for detection and response.
 
-**Credential Theft Has Long-Term Consequences** — Harvested credentials reused for lateral movement weeks later.
+**Credential Theft Has Long-Term Consequences** - Harvested credentials reused for lateral movement weeks later.
 
 ---
 
