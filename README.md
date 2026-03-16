@@ -119,7 +119,7 @@ DeviceFileEvents
 
 **Why It Matters:** Each victim receives a unique ID used to identify them in the attacker's negotiation portal. This confirms the specific ransomware campaign and can be used to correlate intelligence with other victims.
 
-> 💡 The victim ID is found in the ransom note — look for the "Your personal ID" field.
+> 💡 The victim ID is found in the ransom note - look for the "Your personal ID" field.
 
 ---
 
@@ -163,7 +163,7 @@ DeviceEvents
 #### Q6 - Ransomware Staging Domain
 **Objective:** Find the separate domain used to stage the ransomware.
 
-**Why It Matters:** The attacker used a separate subdomain for ransomware staging, demonstrating disciplined infrastructure separation — a hallmark of organized ransomware affiliates.
+**Why It Matters:** The attacker used a separate subdomain for ransomware staging, demonstrating disciplined infrastructure separation - a hallmark of organized ransomware affiliates.
 
 ```kql
 // Find outbound connections from the C2 implant
