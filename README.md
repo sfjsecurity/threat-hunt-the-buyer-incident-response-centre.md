@@ -11,7 +11,7 @@
 
 ## 🧠 Scenario Overview
 
-Following the initial compromise investigated in *"The Broker"*, a ransomware affiliate returned to the environment using pre-staged access. The threat actor leveraged dormant persistence mechanisms from the first intrusion — specifically a pre-installed AnyDesk instance — and re-entered the network through a compromised user account. The attacker deployed a new C2 beacon, disabled security controls, harvested credentials, performed network reconnaissance, moved laterally to the file server, exfiltrated compressed data, and ultimately deployed **Akira ransomware** across two hosts.
+Following the initial compromise investigated in *"The Broker"*, a ransomware affiliate returned to the environment using pre-staged access. The threat actor leveraged dormant persistence mechanisms from the first intrusion specifically a pre-installed AnyDesk instance and re-entered the network through a compromised user account. The attacker deployed a new C2 beacon, disabled security controls, harvested credentials, performed network reconnaissance, moved laterally to the file server, exfiltrated compressed data, and ultimately deployed **Akira ransomware** across two hosts.
 
 > ⚠️ All queries are written for **Microsoft Sentinel** using `TimeGenerated`. For MDE Advanced Hunting, replace `TimeGenerated` with `Timestamp`.
 
@@ -81,7 +81,7 @@ The investigation revealed a multi-stage intrusion spanning two weeks. The threa
 
 **Identified Group:** `Akira`
 
-**Why It Matters:** The ransom note dropped on the file server explicitly identified the ransomware group. Akira is a ransomware-as-a-service (RaaS) operation known for double extortion — encrypting files while threatening to publish stolen data if the ransom is not paid.
+**Why It Matters:** The ransom note dropped on the file server explicitly identified the ransomware group. Akira is a ransomware-as-a-service (RaaS) operation known for double extortion - encrypting files while threatening to publish stolen data if the ransom is not paid.
 
 ```kql
 // Find the ransom note dropped on the file server
@@ -100,7 +100,7 @@ DeviceFileEvents
 
 **Why It Matters:** The TOR onion address provides the victim a channel to communicate and negotiate with the attacker. Documenting this is critical for threat intelligence sharing and law enforcement reporting.
 
-> ⚠️ Note: TOR addresses often contain lowercase `l` characters that visually resemble the number `1` — always copy-paste rather than retyping.
+> ⚠️ Note: TOR addresses often contain lowercase `l` characters that visually resemble the number `1` - always copy-paste rather than retyping.
 
 ```kql
 // Open the ransom note file identified in Q1 and locate the Contact/TOR section
