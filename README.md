@@ -253,7 +253,7 @@ DeviceRegistryEvents
 ---
 
 #### Q12 - Registry Modification Timestamp
-**Objective:** Determine the exact UTC time the registry was modified.
+**Objective:** Determine the exact HH:MM:SS UTC time the registry was modified.
 
 **Why It Matters:** This timestamp anchors the defense evasion phase in the attack timeline, confirming the deliberate sequencing of disabling defenses before ransomware deployment.
 
