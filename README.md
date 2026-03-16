@@ -1,5 +1,5 @@
 # Threat Hunt Report: THE BUYER
-### Ashford Sterling Recruitment — Akira Ransomware Investigation
+### Ashford Sterling Recruitment - Akira Ransomware Investigation
 
 **Analyst:** Sana Jafferi  
 **Date Completed:** 2026-03-16  
@@ -52,18 +52,18 @@ Jan 27  ──► 19:14  Re-entry via AnyDesk (david.mitchell / AS-PC2)
 
 | Chapter | Name | Flags | Focus |
 |---------|------|-------|-------|
-| 1 | Ransom Note Analysis | Q1–Q4 | Ransomware identification and victim details |
-| 2 | Infrastructure | Q5–Q8 | C2 domains, IPs, and remote access relay |
-| 3 | Defense Evasion | Q9–Q12 | Security bypass and registry tampering |
-| 4 | Credential Access | Q13–Q14 | LSASS dumping and named pipe access |
-| 5 | Initial Access | Q15–Q18 | Re-entry via pre-staged remote tool |
-| 6 | Command & Control | Q19–Q22 | C2 beacon deployment and versioning |
-| 7 | Reconnaissance | Q23–Q26 | Network scanning and share enumeration |
+| 1 | Ransom Note Analysis | Q1-Q4 | Ransomware identification and victim details |
+| 2 | Infrastructure | Q5-Q8 | C2 domains, IPs, and remote access relay |
+| 3 | Defense Evasion | Q9-Q12 | Security bypass and registry tampering |
+| 4 | Credential Access | Q13-Q14 | LSASS dumping and named pipe access |
+| 5 | Initial Access | Q15-Q18 | Re-entry via pre-staged remote tool |
+| 6 | Command & Control | Q19-Q22 | C2 beacon deployment and versioning |
+| 7 | Reconnaissance | Q23-Q26 | Network scanning and share enumeration |
 | 8 | Lateral Movement | Q27 | Credential-based pivot to file server |
-| 9 | Tool Transfer | Q28–Q29 | LOLBin abuse and PowerShell downloads |
-| 10 | Exfiltration | Q30–Q32 | Data staging and archive creation |
+| 9 | Tool Transfer | Q28-Q29 | LOLBin abuse and PowerShell downloads |
+| 10 | Exfiltration | Q30-Q32 | Data staging and archive creation |
 | 11 | Ransomware Deployment | Q33–Q38 | Execution, encryption, and ransom note |
-| 12 | Anti-Forensics & Scope | Q39–Q40 | Cleanup and compromised host scope |
+| 12 | Anti-Forensics & Scope | Q39-Q40 | Cleanup and compromised host scope |
 
 ---
 
@@ -249,7 +249,7 @@ DeviceNetworkEvents
 | order by TimeGenerated asc
 ```
 
-> 💡 Two subdomains appear — the staging domain is separate from the Q5 payload domain.
+> 💡 Two subdomains appear - the staging domain is separate from the Q5 payload domain.
 
 ---
 
@@ -269,7 +269,7 @@ DeviceNetworkEvents
 | summarize Domains=make_set(RemoteUrl) by RemoteIP
 ```
 
-> 💡 Two IPs appear — submit comma separated in any order.
+> 💡 Two IPs appear - submit comma separated in any order.
 
 ---
 
@@ -291,7 +291,7 @@ DeviceNetworkEvents
 | order by TimeGenerated asc
 ```
 
-> 💡 Multiple relay subdomains appear — find the one active on `as-srv` during the attack window.
+> 💡 Multiple relay subdomains appear - find the one active on `as-srv` during the attack window.
 
 ---
 
@@ -326,7 +326,7 @@ DeviceFileEvents
 
 `T1562.001 Impair Defenses` `DeviceFileEvents` `Malware Identification`
 
-> 💡 Same query as Q9 — the `SHA256` column on the `kill.bat` row is your answer.
+> 💡 Same query as Q9 - the `SHA256` column on the `kill.bat` row is your answer.
 
 ---
 
@@ -378,7 +378,7 @@ DeviceRegistryEvents
 #### Q13 - Process Hunt
 **Objective:** Find the command used to enumerate processes for credential theft.
 
-**Why It Matters:** Classic pre-dump step — attacker locates `lsass.exe` before memory extraction.
+**Why It Matters:** Classic pre-dump step - attacker locates `lsass.exe` before memory extraction.
 
 `T1003.001 LSASS Memory` `DeviceProcessEvents` `Credential Access`
 
@@ -424,7 +424,7 @@ DeviceEvents
 #### Q15 - Remote Access Tool
 **Objective:** Identify the remote access tool used to re-enter the environment.
 
-**Why It Matters:** Pre-staged during "The Broker" — the attacker returned months later using this foothold, demonstrating the risk of incomplete remediation.
+**Why It Matters:** Pre-staged during "The Broker" - the attacker returned months later using this foothold, demonstrating the risk of incomplete remediation.
 
 `T1219 Remote Access Software` `DeviceProcessEvents` `Initial Access`
 
@@ -445,7 +445,7 @@ DeviceProcessEvents
 #### Q16 - Suspicious Execution Path
 **Objective:** Identify the unusual directory the tool ran from.
 
-**Why It Matters:** World-writable location — no admin privileges required, ideal for persistence.
+**Why It Matters:** World-writable location - no admin privileges required, ideal for persistence.
 
 `T1219 Remote Access Software` `DeviceFileEvents` `Persistence Analysis`
 
@@ -530,7 +530,7 @@ DeviceFileEvents
 | order by TimeGenerated asc
 ```
 
-> 💡 The beacon appears multiple times — created, stopped, recreated. The `FileName` is your answer.
+> 💡 The beacon appears multiple times - created, stopped, recreated. The `FileName` is your answer.
 
 ---
 
@@ -617,7 +617,7 @@ DeviceFileEvents
 
 `T1046 Network Service Scanning` `DeviceFileEvents` `Malware Identification`
 
-> 💡 Same query as Q23 — the `SHA256` column on the scanner row is your answer.
+> 💡 Same query as Q23 - the `SHA256` column on the scanner row is your answer.
 
 ---
 
@@ -645,7 +645,7 @@ DeviceProcessEvents
 #### Q26 - Network Share Enumeration
 **Objective:** Find the two internal IPs where shares were enumerated.
 
-**Why It Matters:** Goal-oriented data targeting — attacker identifying specific exfiltration targets.
+**Why It Matters:** Goal-oriented data targeting - attacker identifying specific exfiltration targets.
 
 `T1135 Network Share Discovery` `DeviceProcessEvents` `Discovery`
 
@@ -660,7 +660,7 @@ DeviceProcessEvents
 | order by TimeGenerated asc
 ```
 
-> 💡 The `ProcessCommandLine` shows the targeted IPs — submit both comma separated.
+> 💡 The `ProcessCommandLine` shows the targeted IPs - submit both comma separated.
 
 ---
 
@@ -669,7 +669,7 @@ DeviceProcessEvents
 #### Q27 - Lateral Account
 **Objective:** Find the account used to access AS-SRV.
 
-**Why It Matters:** Account was obtained from the LSASS dump — demonstrating the cascading impact of credential theft.
+**Why It Matters:** Account was obtained from the LSASS dump - demonstrating the cascading impact of credential theft.
 
 `T1021.001 Remote Desktop` `DeviceLogonEvents` `Lateral Movement`
 
@@ -714,7 +714,7 @@ DeviceProcessEvents
 #### Q29 - Fallback Download Method
 **Objective:** Find the PowerShell cmdlet used when the first method failed.
 
-**Why It Matters:** Three obfuscation techniques used — base64, string concat, variable splitting — showing attacker adaptability.
+**Why It Matters:** Three obfuscation techniques used - base64, string concat, variable splitting — showing attacker adaptability.
 
 `T1059.001 PowerShell` `DeviceEvents` `Tool Transfer`
 
@@ -738,7 +738,7 @@ DeviceEvents
 #### Q30 - Staging Tool
 **Objective:** Find the tool used to compress data before exfiltration.
 
-**Why It Matters:** Double-extortion tactic — stolen data gives the attacker two points of leverage.
+**Why It Matters:** Double-extortion tactic - stolen data gives the attacker two points of leverage.
 
 `T1560 Archive Collected Data` `DeviceFileEvents` `Exfiltration`
 
@@ -763,7 +763,7 @@ DeviceFileEvents
 
 `T1560 Archive Collected Data` `DeviceFileEvents` `Malware Identification`
 
-> 💡 Same query as Q30 — the `SHA256` on the staging tool row is your answer.
+> 💡 Same query as Q30 - the `SHA256` on the staging tool row is your answer.
 
 ---
 
@@ -848,7 +848,7 @@ DeviceFileEvents
 #### Q36 - Recovery Prevention
 **Objective:** Find the command used to delete Volume Shadow Copies.
 
-**Why It Matters:** Prevents file restoration without paying ransom — standard pre-encryption step.
+**Why It Matters:** Prevents file restoration without paying ransom - standard pre-encryption step.
 
 `T1490 Inhibit System Recovery` `DeviceProcessEvents` `Impact Analysis`
 
@@ -903,7 +903,7 @@ DeviceFileEvents
 #### Q39 - Cleanup Script
 **Objective:** Find the script that deleted the ransomware binary.
 
-**Why It Matters:** Deliberate anti-forensics — prevents recovery and analysis of the ransomware sample.
+**Why It Matters:** Deliberate anti-forensics - prevents recovery and analysis of the ransomware sample.
 
 `T1485 Data Destruction` `DeviceFileEvents` `Anti-Forensics`
 
