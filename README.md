@@ -547,6 +547,7 @@ DeviceLogonEvents
 | project TimeGenerated, DeviceName, AccountName, RemoteIP, LogonType
 | order by TimeGenerated asc
 ```
+<img width="1127" height="273" alt="image" src="https://github.com/user-attachments/assets/4b56852d-2f8b-4d7e-a5bb-cb1bb3a575ba" />
 
 > 💡 The `AccountName` column is your answer.
 
@@ -575,6 +576,7 @@ DeviceFileEvents
 | project TimeGenerated, DeviceName, FileName, FolderPath, SHA256, InitiatingProcessFileName
 | order by TimeGenerated asc
 ```
+<img width="1305" height="230" alt="image" src="https://github.com/user-attachments/assets/bf6f77bc-9e22-4caa-afe4-22be7225d8bd" />
 
 > 💡 The beacon appears multiple times - created, stopped, recreated. The `FileName` is your answer.
 
@@ -606,11 +608,13 @@ DeviceFileEvents
 | where DeviceName == "as-pc2"
 | where ActionType == "FileCreated"
 | where FolderPath contains "ProgramData"
+| where FileName == "wsync.exe"
 | where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
-| where FileName endswith ".exe"
 | project TimeGenerated, DeviceName, FileName, FolderPath, SHA256
 | order by TimeGenerated asc
 ```
+<img width="1442" height="101" alt="image" src="https://github.com/user-attachments/assets/619f9a96-55dd-4d17-8255-72cfbe5ccc57" />
+
 
 > 💡 The **first row** is the original beacon - its `SHA256` is your answer.
 
@@ -630,10 +634,12 @@ DeviceFileEvents
 | where DeviceName == "as-pc2"
 | where ActionType == "FileModified"
 | where FolderPath contains "ProgramData"
+| where FileName == "wsync.exe"
 | where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | project TimeGenerated, DeviceName, FileName, FolderPath, SHA256
 | order by TimeGenerated asc
 ```
+<img width="1413" height="111" alt="image" src="https://github.com/user-attachments/assets/9ffc6482-d545-455b-8494-29b5dbd0826c" />
 
 > 💡 The replacement appears as a `FileModified` event - its `SHA256` is your answer.
 
@@ -661,6 +667,7 @@ DeviceFileEvents
 | project TimeGenerated, DeviceName, FileName, FolderPath, SHA256
 | order by TimeGenerated asc
 ```
+<img width="1447" height="112" alt="image" src="https://github.com/user-attachments/assets/795e1361-1b85-4905-88f7-679dd6bad11f" />
 
 > 💡 The `FileName` column is your answer.
 
@@ -687,14 +694,16 @@ The scanner was executed with specific arguments. Find the full arguments as exe
 **Why It Matters:** Portable mode leaves no installation footprint - deliberate evasion technique.
 
 ```kql
-// Find how the scanner was executed
+// Find how the scanner was executed with arguments
 DeviceProcessEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
-| where FileName == "scan.exe"
-| project TimeGenerated, DeviceName, FileName, ProcessCommandLine
+| where FileName == "advanced_ip_scanner.exe"
+| project TimeGenerated, DeviceName, FileName, ProcessCommandLine, InitiatingProcessCommandLine
 | order by TimeGenerated asc
 ```
+<img width="1720" height="157" alt="image" src="https://github.com/user-attachments/assets/8d7d3cec-a599-4eab-9fb9-128a4974afd4" />
+
 
 > 💡 Everything in `ProcessCommandLine` after the filename is your answer.
 
@@ -718,6 +727,7 @@ DeviceProcessEvents
 | project TimeGenerated, DeviceName, FileName, ProcessCommandLine
 | order by TimeGenerated asc
 ```
+<img width="902" height="108" alt="image" src="https://github.com/user-attachments/assets/2a98e8dc-9883-4cb3-b7e0-c21742ee011a" />
 
 > 💡 The `ProcessCommandLine` shows the targeted IPs - submit both comma separated.
 
@@ -745,6 +755,7 @@ DeviceLogonEvents
 | project TimeGenerated, DeviceName, AccountName, RemoteIP, LogonType
 | order by TimeGenerated asc
 ```
+<img width="1087" height="252" alt="image" src="https://github.com/user-attachments/assets/bcf8fbd5-32d8-4550-97ce-b701ae67af03" />
 
 > 💡 The `AccountName` column is your answer.
 
@@ -771,6 +782,7 @@ DeviceProcessEvents
 | project TimeGenerated, DeviceName, FileName, ProcessCommandLine
 | order by TimeGenerated asc
 ```
+<img width="1427" height="250" alt="image" src="https://github.com/user-attachments/assets/2636e4fb-b721-423e-8f15-9eb49d42a08b" />
 
 > 💡 The `FileName` at the earliest timestamp is your answer.
 
@@ -794,6 +806,7 @@ DeviceEvents
 | project TimeGenerated, DeviceName, AdditionalFields
 | order by TimeGenerated asc
 ```
+<img width="1700" height="297" alt="image" src="https://github.com/user-attachments/assets/39f21117-9c26-4c7c-aef3-ee8b1fb50332" />
 
 > 💡 The alias `IWR` in `AdditionalFields` stands for the full cmdlet name - that's your answer.
 
@@ -822,6 +835,8 @@ DeviceFileEvents
 | project TimeGenerated, DeviceName, FileName, FolderPath, SHA256, InitiatingProcessFileName
 | order by TimeGenerated asc
 ```
+<img width="1653" height="305" alt="image" src="https://github.com/user-attachments/assets/18bce8f4-7112-4c57-871e-cf8db49dc2d1" />
+
 
 > 💡 Look for a short, non-descriptive executable - that's the staging tool.
 
@@ -857,6 +872,7 @@ DeviceFileEvents
 | project TimeGenerated, DeviceName, FileName, FolderPath, SHA256
 | order by TimeGenerated asc
 ```
+<img width="1495" height="297" alt="image" src="https://github.com/user-attachments/assets/feb24650-f835-403e-aca7-10c1b82886de" />
 
 > 💡 The `FileName` column is your answer.
 
@@ -885,6 +901,7 @@ DeviceFileEvents
 | project TimeGenerated, DeviceName, FileName, FolderPath, SHA256, InitiatingProcessFileName
 | order by TimeGenerated asc
 ```
+<img width="1727" height="147" alt="image" src="https://github.com/user-attachments/assets/9111b1a4-def8-4ed1-9bab-de1bb6824758" />
 
 > 💡 Look for an executable mimicking a legitimate Windows process name.
 
@@ -920,6 +937,7 @@ DeviceFileEvents
 | project TimeGenerated, DeviceName, FileName, FolderPath, InitiatingProcessFileName, InitiatingProcessCommandLine
 | order by TimeGenerated asc
 ```
+<img width="1710" height="313" alt="image" src="https://github.com/user-attachments/assets/49e0c3d0-b754-458b-b614-bfa4fda70948" />
 
 > 💡 The `InitiatingProcessFileName` on the ransomware row is your answer.
 
@@ -934,13 +952,15 @@ The attacker deleted backup copies to prevent recovery. Find the full command.
 **Why It Matters:** Prevents file restoration without paying ransom - standard pre-encryption step.
 
 ```kql
-// Look at what ran in the defense evasion window (use FLAG 12 timestamp as anchor)
+// Find recovery prevention command executed during defense evasion
 DeviceProcessEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where TimeGenerated between (datetime(2026-01-27T21:00:00Z) .. datetime(2026-01-27T21:15:00Z))
+| where FileName has_any ("wmic.exe", "vssadmin.exe", "bcdedit.exe", "wbadmin.exe")
 | project TimeGenerated, DeviceName, FileName, ProcessCommandLine
 | order by TimeGenerated asc
 ```
+<img width="1421" height="172" alt="image" src="https://github.com/user-attachments/assets/15cf05e0-5115-4058-a048-0812b0e15a15" />
 
 > 💡 The recovery prevention command stands out in the `ProcessCommandLine` column.
 
@@ -964,6 +984,7 @@ DeviceFileEvents
 | project TimeGenerated, DeviceName, FileName, FolderPath, SHA256, InitiatingProcessFileName
 | order by TimeGenerated asc
 ```
+<img width="1677" height="248" alt="image" src="https://github.com/user-attachments/assets/1f55c3f0-f332-4451-b45c-65b22fac832c" />
 
 > 💡 The `InitiatingProcessFileName` column is your FLAG 37 answer.
 
@@ -1003,6 +1024,7 @@ DeviceFileEvents
 | project TimeGenerated, DeviceName, FileName, FolderPath, InitiatingProcessFileName, InitiatingProcessCommandLine
 | order by TimeGenerated asc
 ```
+<img width="1697" height="152" alt="image" src="https://github.com/user-attachments/assets/535e7171-9122-4dc1-9fa0-77a644ac7f18" />
 
 > 💡 The `InitiatingProcessCommandLine` reveals the cleanup script name.
 
@@ -1017,14 +1039,16 @@ Determine the full scope of the compromise. What hosts were affected?
 **Why It Matters:** Ensures no affected systems are missed during remediation.
 
 ```kql
-// Find all hosts where ransom notes were dropped
+// Find all hosts where C2 beacon was deployed
 DeviceFileEvents
-| where ActionType == "FileCreated"
-| where FileName contains "readme"
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
+| where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
+| where ActionType == "FileCreated"
+| where FileName == "wsync.exe"
 | summarize count() by DeviceName
 | order by count_ desc
 ```
+<img width="435" height="170" alt="image" src="https://github.com/user-attachments/assets/00e7dc6a-5d6f-46be-8c55-fbe706ce3bea" />
 
 > 💡 Every host with a ransom note was encrypted. Submit all hostnames comma separated.
 
