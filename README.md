@@ -159,6 +159,7 @@ DeviceFileEvents
 | project TimeGenerated, DeviceName, FileName, FolderPath
 | order by TimeGenerated asc
 ```
+<img width="1105" height="266" alt="Image" src="https://github.com/user-attachments/assets/6e4efdc1-9aa8-4f0d-b542-e7fcc3bdf14d" />
 
 > 💡 Open the file at the path shown in `FolderPath` - Q1 through Q4 are all answered by reading the ransom note.
 
@@ -235,6 +236,7 @@ DeviceProcessEvents
 | project TimeGenerated, DeviceName, FileName, ProcessCommandLine
 | order by TimeGenerated asc
 ```
+<img width="1416" height="270" alt="Image" src="https://github.com/user-attachments/assets/49d8c80b-1e3f-44af-83ce-ebb31aa2ddf0" />
 
 > 💡 The domain appears in the `ProcessCommandLine` column download URLs.
 
@@ -260,6 +262,7 @@ DeviceNetworkEvents
 | project TimeGenerated, DeviceName, RemoteUrl, RemoteIP, RemotePort, InitiatingProcessFileName
 | order by TimeGenerated asc
 ```
+<img width="1466" height="337" alt="Image" src="https://github.com/user-attachments/assets/b7acc995-61f8-4de7-a29d-369be8b5cf92" />
 
 > 💡 Two subdomains appear - the staging domain is separate from the Q5 payload domain.
 
@@ -281,6 +284,7 @@ DeviceNetworkEvents
 | where RemoteUrl contains "cloud-endpoint"
 | summarize Domains=make_set(RemoteUrl) by RemoteIP
 ```
+<img width="613" height="142" alt="image" src="https://github.com/user-attachments/assets/70506454-c896-4600-b35d-96e18486e135" />
 
 > 💡 Two IPs appear - submit comma separated in any order.
 
@@ -304,6 +308,7 @@ DeviceNetworkEvents
 | project TimeGenerated, DeviceName, RemoteUrl, RemoteIP, InitiatingProcessFileName
 | order by TimeGenerated asc
 ```
+<img width="1123" height="322" alt="image" src="https://github.com/user-attachments/assets/e619e21f-9416-4031-a39e-ed5cd2a9fcc6" />
 
 > 💡 Multiple relay subdomains appear - find the one active on `as-srv` during the attack window.
 
@@ -331,6 +336,7 @@ DeviceFileEvents
 | project TimeGenerated, DeviceName, FileName, FolderPath, SHA256, InitiatingProcessFileName
 | order by TimeGenerated asc
 ```
+<img width="1447" height="317" alt="image" src="https://github.com/user-attachments/assets/746bb919-e3e3-49a4-816e-00376930f03b" />
 
 > 💡 The evasion script was created on the initial workstation, not the server. Look at `InitiatingProcessFileName` - scripts created by suspicious processes stand out.
 
@@ -365,6 +371,7 @@ DeviceRegistryEvents
 | project TimeGenerated, DeviceName, RegistryKey, RegistryValueName, RegistryValueData
 | order by TimeGenerated asc
 ```
+<img width="1397" height="175" alt="image" src="https://github.com/user-attachments/assets/68bd8570-8a44-49b3-b276-9b9dd424fdea" />
 
 > 💡 The `RegistryValueName` column is your answer.
 
@@ -388,6 +395,7 @@ DeviceRegistryEvents
 | project TimeGenerated, DeviceName, RegistryKey, RegistryValueName
 | order by TimeGenerated asc
 ```
+<img width="907" height="136" alt="image" src="https://github.com/user-attachments/assets/66360268-f514-4cf2-aa49-4763b0fb1bcb" />
 
 > 💡 Format `TimeGenerated` as `HH:MM:SS` UTC - drop the date and milliseconds.
 
@@ -414,6 +422,7 @@ DeviceProcessEvents
 | project TimeGenerated, DeviceName, FileName, ProcessCommandLine
 | order by TimeGenerated asc
 ```
+<img width="990" height="195" alt="image" src="https://github.com/user-attachments/assets/cc3802b2-74fe-4030-b0d5-92b90ee4cff6" />
 
 > 💡 Submit the exact command shown in `ProcessCommandLine`.
 
@@ -434,10 +443,11 @@ DeviceEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where TimeGenerated between (datetime(2026-01-27) .. datetime(2026-01-28))
 | extend PipeName = tostring(parse_json(AdditionalFields).PipeName)
-| where PipeName != ""
+| where PipeName contains "lsass"
 | project TimeGenerated, DeviceName, PipeName, InitiatingProcessFileName, AdditionalFields
 | order by TimeGenerated asc
 ```
+<img width="1447" height="331" alt="image" src="https://github.com/user-attachments/assets/a8fc744d-b619-4fe8-ac38-87888efe661f" />
 
 > 💡 The `PipeName` field contains the full pipe path. Submit the exact value.
 
@@ -464,6 +474,7 @@ DeviceProcessEvents
 | project TimeGenerated, DeviceName, FileName, FolderPath, ProcessCommandLine
 | order by TimeGenerated asc
 ```
+<img width="1433" height="298" alt="image" src="https://github.com/user-attachments/assets/847a99d5-2844-40ba-9f04-f2edbb3e7329" />
 
 > 💡 The unusual `FolderPath` is the red flag - the `FileName` is your answer.
 
@@ -487,6 +498,7 @@ DeviceFileEvents
 | project TimeGenerated, DeviceName, FileName, FolderPath, SHA256
 | order by TimeGenerated asc
 ```
+<img width="1456" height="286" alt="image" src="https://github.com/user-attachments/assets/bd0ec286-4624-4e03-94bc-7c309caa7acb" />
 
 > 💡 The `FolderPath` column minus the filename is your answer.
 
@@ -511,6 +523,7 @@ DeviceNetworkEvents
 | summarize count() by RemoteIP
 | order by count_ desc
 ```
+<img width="356" height="228" alt="image" src="https://github.com/user-attachments/assets/27ffdcc2-058d-4cd0-bb00-c495a276540d" />
 
 > 💡 The IP appearing most consistently is the attacker's real external IP.
 
