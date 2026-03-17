@@ -9,6 +9,8 @@
 
 > ⚠️ All queries use `TimeGenerated` for Sentinel. For MDE Advanced Hunting replace with `Timestamp`.
 
+<img width="300" height="1536" alt="Image" src="https://github.com/user-attachments/assets/209d5298-c1b5-4768-bee9-847a490155ef" /> 
+
 ---
 
 ## INCIDENT_BRIEF
