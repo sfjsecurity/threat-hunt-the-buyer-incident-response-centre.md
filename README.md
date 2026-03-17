@@ -4,7 +4,7 @@
 **Analyst:** Sana Jafferi  
 **Date Completed:** 2026-03-16  
 **Environment Investigated:** AS-PC1, AS-PC2, AS-SRV  
-**Timeframe:** January 15 – January 31, 2026  
+**Timeframe:** January 15 - January 31, 2026  
 **Platform:** Microsoft Defender for Endpoint + Microsoft Sentinel  
 
 > ⚠️ All queries use `TimeGenerated` for Sentinel. For MDE Advanced Hunting replace with `Timestamp`.
@@ -30,20 +30,20 @@ Following the initial compromise in *"The Broker"*, a ransomware affiliate retur
 ## ATTACK_CHAIN
 
 ```
-Jan 15  ──► AnyDesk staged on all hosts (The Broker)
+Jan 15  --► AnyDesk staged on all hosts (The Broker)
              Credentials dumped to C:\Users\Public\
 
-Jan 27  ──► 19:14  Re-entry via AnyDesk (david.mitchell / AS-PC2)
-             20:17  scan.exe → network mapped
+Jan 27  --► 19:14  Re-entry via AnyDesk (david.mitchell / AS-PC2)
+             20:17  scan.exe - network mapped
              20:22  wsync.exe deployed (C2 beacon)
              20:45  LSASS dumped via named pipe
              21:00  tasklist | findstr lsass
-             21:03  kill.bat → Defender disabled → VSS deleted
-             22:07  Lateral move → AS-SRV (as.srv.administrator)
+             21:03  kill.bat - Defender disabled - VSS deleted
+             22:07  Lateral move - AS-SRV (as.srv.administrator)
              22:15  updater.exe staged via PowerShell
-             22:18  st.exe → exfil_data.zip
-         22:18:33  🔴 Encryption starts → akira_readme.txt dropped
-             22:20  clean.bat → updater.exe deleted
+             22:18  st.exe - exfil_data.zip
+         22:18:33  🔴 Encryption starts - akira_readme.txt dropped
+             22:20  clean.bat - updater.exe deleted
 ```
 
 ---
@@ -52,18 +52,18 @@ Jan 27  ──► 19:14  Re-entry via AnyDesk (david.mitchell / AS-PC2)
 
 | Chapter | Name | Flags | Focus |
 |---------|------|-------|-------|
-| 1 | Ransom Note Analysis | Q1–Q4 | Ransomware identification and victim details |
-| 2 | Infrastructure | Q5–Q8 | C2 domains, IPs, and remote access relay |
-| 3 | Defense Evasion | Q9–Q12 | Security bypass and registry tampering |
-| 4 | Credential Access | Q13–Q14 | LSASS dumping and named pipe access |
-| 5 | Initial Access | Q15–Q18 | Re-entry via pre-staged remote tool |
-| 6 | Command & Control | Q19–Q22 | C2 beacon deployment and versioning |
-| 7 | Reconnaissance | Q23–Q26 | Network scanning and share enumeration |
+| 1 | Ransom Note Analysis | Q1-Q4 | Ransomware identification and victim details |
+| 2 | Infrastructure | Q5-Q8 | C2 domains, IPs, and remote access relay |
+| 3 | Defense Evasion | Q9-Q12 | Security bypass and registry tampering |
+| 4 | Credential Access | Q13-Q14 | LSASS dumping and named pipe access |
+| 5 | Initial Access | Q15-Q18 | Re-entry via pre-staged remote tool |
+| 6 | Command & Control | Q19-Q22 | C2 beacon deployment and versioning |
+| 7 | Reconnaissance | Q23-Q26 | Network scanning and share enumeration |
 | 8 | Lateral Movement | Q27 | Credential-based pivot to file server |
-| 9 | Tool Transfer | Q28–Q29 | LOLBin abuse and PowerShell downloads |
-| 10 | Exfiltration | Q30–Q32 | Data staging and archive creation |
-| 11 | Ransomware Deployment | Q33–Q38 | Execution, encryption, and ransom note |
-| 12 | Anti-Forensics & Scope | Q39–Q40 | Cleanup and compromised host scope |
+| 9 | Tool Transfer | Q28-Q29 | LOLBin abuse and PowerShell downloads |
+| 10 | Exfiltration | Q30-Q32 | Data staging and archive creation |
+| 11 | Ransomware Deployment | Q33-Q38 | Execution, encryption, and ransom note |
+| 12 | Anti-Forensics & Scope | Q39-Q40 | Cleanup and compromised host scope |
 
 ---
 
@@ -135,14 +135,17 @@ Jan 27  ──► 19:14  Re-entry via AnyDesk (david.mitchell / AS-PC2)
 
 ---
 
-### 🔴 SECTION 1: Ransom Note Analysis
+### 🔴 CHAPTER 1: Ransom Note Analysis
 
-#### Q1 - Threat Actor
-**Objective:** Identify the ransomware group from the ransom note.
+---
 
-**Why It Matters:** Akira is a RaaS operation known for double extortion - encrypting files while threatening to publish stolen data.
+#### FLAG 1: THREAT ACTOR `[MODERATE]`
+
+Identify the ransomware group responsible from the ransom note.
 
 `T1486 Data Encrypted` `DeviceFileEvents` `Ransom Note Analysis`
+
+**Why It Matters:** Akira is a RaaS operation known for double extortion - encrypting files while threatening to publish stolen data.
 
 ```kql
 // Find the ransom note - answers to Q1, Q2, Q3 and Q4 are inside the file
@@ -159,35 +162,38 @@ DeviceFileEvents
 
 ---
 
-#### Q2 - Negotiation Portal
-**Objective:** Find the TOR address from the ransom note.
+#### FLAG 2: NEGOTIATION PORTAL `[MODERATE]`
+
+The ransom note provides a contact method. Find the TOR negotiation address.
+
+`T1486 Data Encrypted` `Ransom Note Analysis` `Threat Intelligence`
 
 **Why It Matters:** Documents the attacker's communication channel for threat intelligence and law enforcement reporting.
-
-`T1486 Data Encrypted` `Ransom Note Analysis`
 
 > 💡 No query needed - open the ransom note from Q1 and find the **Contact** section.
 > ⚠️ Always copy-paste TOR addresses - lowercase `l` and number `1` look identical.
 
 ---
 
-#### Q3 - Victim ID
-**Objective:** Find the unique victim identifier.
+#### FLAG 3: VICTIM ID `[MODERATE]`
+
+Each victim receives a unique identifier. Find it.
+
+`T1486 Data Encrypted` `Ransom Note Analysis` `Threat Intelligence`
 
 **Why It Matters:** Confirms the specific campaign and enables intelligence correlation with other Akira victims.
-
-`T1486 Data Encrypted` `Ransom Note Analysis`
 
 > 💡 No query needed - find the **Your personal ID:** field in the ransom note from Q1.
 
 ---
 
-#### Q4 - Encrypted Extension
-**Objective:** Identify the extension appended to encrypted files.
+#### FLAG 4: ENCRYPTED EXTENSION `[MODERATE]`
 
-**Why It Matters:** Confirms the ransomware variant and enables scope assessment across the environment.
+Encrypted files have a new extension appended. Identify it.
 
 `T1486 Data Encrypted` `DeviceFileEvents` `Impact Analysis`
+
+**Why It Matters:** Confirms the ransomware variant and enables scope assessment across the environment.
 
 > 💡 Stated in the ransom note. Use the query below to confirm in the logs.
 
@@ -203,14 +209,17 @@ DeviceFileEvents
 
 ---
 
-### 🌐 SECTION 2: Infrastructure
+### 🌐 CHAPTER 2: Infrastructure
 
-#### Q5 - Payload Domain
-**Objective:** Find the domain that hosted attacker tools.
+---
 
-**Why It Matters:** Enables perimeter blocking and threat intelligence correlation. The attacker used three obfuscated PowerShell download methods to evade detection.
+#### FLAG 5: PAYLOAD DOMAIN `[MODERATE]`
+
+Tools were downloaded from an external domain. Identify it.
 
 `T1105 Ingress Tool Transfer` `DeviceProcessEvents` `Infrastructure Analysis`
+
+**Why It Matters:** Enables perimeter blocking and threat intelligence correlation. The attacker used three obfuscated PowerShell download methods to evade detection.
 
 > ⚠️ DO NOT browse to this domain directly.
 
@@ -229,12 +238,13 @@ DeviceProcessEvents
 
 ---
 
-#### Q6 - Ransomware Staging Domain
-**Objective:** Find the separate domain used to stage the ransomware.
+#### FLAG 6: RANSOMWARE STAGING DOMAIN `[MODERATE]`
 
-**Why It Matters:** Separate staging infrastructure demonstrates disciplined tradecraft - a hallmark of organized ransomware affiliates.
+The payload established outbound connections. Find the staging domain.
 
 `T1071 Application Layer Protocol` `DeviceNetworkEvents` `Infrastructure Analysis`
+
+**Why It Matters:** Separate staging infrastructure demonstrates disciplined tradecraft - a hallmark of organized ransomware affiliates.
 
 > ⚠️ DO NOT browse to this domain directly.
 
@@ -253,12 +263,13 @@ DeviceNetworkEvents
 
 ---
 
-#### Q7 - C2 IP Addresses
-**Objective:** Find the two IPs resolving to attacker infrastructure.
+#### FLAG 7: C2 IP ADDRESSES `[MODERATE]`
 
-**Why It Matters:** Both are Cloudflare-fronted proxies masking the real origin. Enables firewall blocking and intelligence correlation.
+The C2 infrastructure resolved to multiple IPs. Find both.
 
 `T1071 Application Layer Protocol` `DeviceNetworkEvents` `Network Analysis`
+
+**Why It Matters:** Both are Cloudflare-fronted proxies masking the real origin. Enables firewall blocking and intelligence correlation.
 
 ```kql
 // Summarize IPs contacted by the C2 implant
@@ -273,12 +284,13 @@ DeviceNetworkEvents
 
 ---
 
-#### Q8 - Remote Tool Relay Domain
-**Objective:** Find the specific AnyDesk relay domain used during the attack.
+#### FLAG 8: REMOTE TOOL RELAY `[MODERATE]`
 
-**Why It Matters:** Confirms which session was active during the intrusion and enables blocking of that specific relay.
+A remote tool routes through relay servers. Find the specific relay domain used.
 
 `T1219 Remote Access Software` `DeviceNetworkEvents` `Infrastructure Analysis`
+
+**Why It Matters:** Confirms which session was active during the intrusion and enables blocking of that specific relay.
 
 ```kql
 // Find relay connections made by the remote access tool
@@ -295,14 +307,17 @@ DeviceNetworkEvents
 
 ---
 
-### 🛡️ SECTION 3: Defense Evasion
+### 🛡️ CHAPTER 3: Defense Evasion
 
-#### Q9 - Evasion Script
-**Objective:** Identify the script used to disable security controls.
+---
 
-**Why It Matters:** The script disabled multiple Defender components and modified the registry - created by the C2 implant before ransomware deployment.
+#### FLAG 9: EVASION SCRIPT `[HARD]`
+
+A script was used to disable security controls before ransomware deployment.
 
 `T1562.001 Impair Defenses` `DeviceFileEvents` `Defense Evasion`
+
+**Why It Matters:** The script disabled multiple Defender components and modified the registry - created by the C2 implant to clear the path for ransomware.
 
 ```kql
 // Find script files created by suspicious processes in ProgramData
@@ -319,23 +334,25 @@ DeviceFileEvents
 
 ---
 
-#### Q10 - Evasion Script Hash
-**Objective:** Get the SHA256 of the evasion script.
+#### FLAG 10: EVASION HASH `[HARD]`
 
-**Why It Matters:** Enables threat intelligence correlation and detection rule creation.
+Identify the SHA256 of the evasion script.
 
 `T1562.001 Impair Defenses` `DeviceFileEvents` `Malware Identification`
 
-> 💡 Same query as Q9 - the `SHA256` column on the `kill.bat` row is your answer.
+**Why It Matters:** Enables threat intelligence correlation and detection rule creation.
+
+> 💡 Same query as FLAG 9 - the `SHA256` column on the `kill.bat` row is your answer.
 
 ---
 
-#### Q11 - Registry Tampering
-**Objective:** Find the registry value used to disable Windows Defender.
+#### FLAG 11: REGISTRY TAMPERING `[HARD]`
 
-**Why It Matters:** A policy registry change that survives reboots - more persistent than a process-level disable.
+Windows Defender was disabled via registry modification. Find the registry value name.
 
 `T1112 Modify Registry` `DeviceRegistryEvents` `Defense Evasion`
+
+**Why It Matters:** A policy registry change that survives reboots - more persistent than a process-level disable.
 
 ```kql
 // Find registry modifications to Windows Defender policy keys
@@ -351,12 +368,13 @@ DeviceRegistryEvents
 
 ---
 
-#### Q12 - Registry Timestamp
-**Objective:** Find the exact UTC time the registry was modified.
+#### FLAG 12: REGISTRY TIMESTAMP `[HARD]`
 
-**Why It Matters:** Anchors the defense evasion phase - this timestamp also helps find Q36.
+Determine the exact UTC time the registry was modified.
 
 `T1112 Modify Registry` `DeviceRegistryEvents` `Timeline Analysis`
+
+**Why It Matters:** Anchors the defense evasion phase - this timestamp also helps find FLAG 36.
 
 ```kql
 // Find the exact timestamp of the Defender registry modification
@@ -373,14 +391,17 @@ DeviceRegistryEvents
 
 ---
 
-### 🔑 SECTION 4: Credential Access
+### 🔑 CHAPTER 4: Credential Access
 
-#### Q13 - Process Hunt
-**Objective:** Find the command used to enumerate processes for credential theft.
+---
 
-**Why It Matters:** Classic pre-dump step - attacker locates `lsass.exe` before memory extraction.
+#### FLAG 13: PROCESS HUNT `[ADVANCED]`
+
+The attacker enumerated running processes to locate a target for credential theft. Find the command.
 
 `T1003.001 LSASS Memory` `DeviceProcessEvents` `Credential Access`
+
+**Why It Matters:** Classic pre-dump step - attacker locates `lsass.exe` before memory extraction.
 
 ```kql
 // Find process enumeration commands targeting lsass
@@ -396,12 +417,13 @@ DeviceProcessEvents
 
 ---
 
-#### Q14 - Credential Pipe
-**Objective:** Find the named pipe accessed during credential theft.
+#### FLAG 14: CREDENTIAL PIPE `[ADVANCED]`
 
-**Why It Matters:** Identifies the credential dumping method and provides a detection opportunity.
+A named pipe was accessed during credential theft. Find the full pipe path.
 
 `T1003.001 LSASS Memory` `DeviceEvents` `Credential Access`
+
+**Why It Matters:** Identifies the credential dumping method and provides a detection opportunity.
 
 ```kql
 // Find named pipe events related to credential access
@@ -419,14 +441,17 @@ DeviceEvents
 
 ---
 
-### 🚪 SECTION 5: Initial Access
+### 🚪 CHAPTER 5: Initial Access
 
-#### Q15 - Remote Access Tool
-**Objective:** Identify the remote access tool used to re-enter the environment.
+---
 
-**Why It Matters:** Pre-staged during "The Broker" - the attacker returned months later using this foothold, demonstrating the risk of incomplete remediation.
+#### FLAG 15: REMOTE ACCESS TOOL `[HARD]`
+
+A remote access tool was pre-staged from the previous attack. Identify it.
 
 `T1219 Remote Access Software` `DeviceProcessEvents` `Initial Access`
+
+**Why It Matters:** Pre-staged during "The Broker" - the attacker returned months later using this foothold, demonstrating the risk of incomplete remediation.
 
 ```kql
 // Find remote access tools running from unusual locations on attack day
@@ -442,12 +467,13 @@ DeviceProcessEvents
 
 ---
 
-#### Q16 - Suspicious Execution Path
-**Objective:** Identify the unusual directory the tool ran from.
+#### FLAG 16: SUSPICIOUS EXECUTION PATH `[HARD]`
 
-**Why It Matters:** World-writable location - no admin privileges required, ideal for persistence.
+The remote access tool was running from an unusual location. Find the full directory path.
 
 `T1219 Remote Access Software` `DeviceFileEvents` `Persistence Analysis`
+
+**Why It Matters:** World-writable location - no admin privileges required, ideal for persistence.
 
 ```kql
 // Find where the remote access tool was installed during The Broker
@@ -464,12 +490,13 @@ DeviceFileEvents
 
 ---
 
-#### Q17 - Attacker External IP
-**Objective:** Identify the attacker's real external IP.
+#### FLAG 17: ATTACKER IP `[HARD]`
 
-**Why It Matters:** Enables perimeter blocking and threat intelligence sharing.
+Identify the attacker's external IP address.
 
 `T1219 Remote Access Software` `DeviceNetworkEvents` `Network Analysis`
+
+**Why It Matters:** Enables perimeter blocking and threat intelligence sharing.
 
 ```kql
 // Find external IPs connecting through the remote access tool
@@ -487,12 +514,13 @@ DeviceNetworkEvents
 
 ---
 
-#### Q18 - Compromised User
-**Objective:** Identify the compromised account on AS-PC2.
+#### FLAG 18: COMPROMISED USER `[HARD]`
 
-**Why It Matters:** Enables immediate credential reset and scope assessment.
+Identify the user account compromised on AS-PC2.
 
 `T1078 Valid Accounts` `DeviceLogonEvents` `Identity Analysis`
+
+**Why It Matters:** Enables immediate credential reset and scope assessment.
 
 ```kql
 // Find successful remote logons to AS-PC2 on attack day
@@ -509,14 +537,17 @@ DeviceLogonEvents
 
 ---
 
-### 📡 SECTION 6: Command & Control
+### 📡 CHAPTER 6: Command & Control
 
-#### Q19 - Primary C2 Beacon
-**Objective:** Identify the C2 beacon deployed after the previous one failed.
+---
 
-**Why It Matters:** Primary implant establishing C2 communications blending in with normal HTTPS traffic.
+#### FLAG 19: PRIMARY C2 BEACON `[HARD]`
+
+A new beacon was deployed after the previous one failed. Identify it.
 
 `T1071 Application Layer Protocol` `DeviceFileEvents` `Malware Identification`
+
+**Why It Matters:** Primary implant establishing C2 communications blending in with normal HTTPS traffic.
 
 ```kql
 // Find suspicious executables created in ProgramData
@@ -534,21 +565,25 @@ DeviceFileEvents
 
 ---
 
-#### Q20 - Beacon Deployment Location
-**Objective:** Identify where the beacon was deployed.
+#### FLAG 20: BEACON LOCATION `[HARD]`
+
+Identify where the beacon was deployed.
 
 `T1071 Application Layer Protocol` `DeviceFileEvents` `Malware Identification`
 
-> 💡 Same query as Q19 - the `FolderPath` column minus the filename is your answer.
+**Why It Matters:** Reveals the attacker's staging preference - accessible to all users, blends with legitimate application data.
+
+> 💡 Same query as FLAG 19 - the `FolderPath` column minus the filename is your answer.
 
 ---
 
-#### Q21 - Original Beacon Hash
-**Objective:** Find the SHA256 of the first beacon deployment.
+#### FLAG 21: ORIGINAL BEACON HASH `[HARD]`
 
-**Why It Matters:** Enables detection signature creation and correlation with other Akira campaigns.
+The first beacon deployment was later replaced. Find the SHA256 of the original.
 
 `T1071 Application Layer Protocol` `DeviceFileEvents` `Malware Identification`
+
+**Why It Matters:** Enables detection signature creation and correlation with other Akira campaigns.
 
 ```kql
 // Find all versions of the beacon created on AS-PC2
@@ -566,12 +601,13 @@ DeviceFileEvents
 
 ---
 
-#### Q22 - Replacement Beacon Hash
-**Objective:** Find the SHA256 of the replacement beacon.
+#### FLAG 22: REPLACEMENT BEACON HASH `[HARD]`
 
-**Why It Matters:** Different hash confirms the attacker actively managed C2 - deploying a more stable variant.
+A second beacon was deployed after the first failed. Find its SHA256.
 
 `T1071 Application Layer Protocol` `DeviceFileEvents` `Malware Identification`
+
+**Why It Matters:** Different hash confirms the attacker actively managed C2 - deploying a more stable variant.
 
 ```kql
 // Find the replacement beacon
@@ -588,14 +624,17 @@ DeviceFileEvents
 
 ---
 
-### 🔭 SECTION 7: Reconnaissance
+### 🔭 CHAPTER 7: Reconnaissance
 
-#### Q23 - Scanner Tool
-**Objective:** Identify the network scanner deployed.
+---
 
-**Why It Matters:** Used to map internal hosts for lateral movement targeting.
+#### FLAG 23: SCANNER TOOL `[MODERATE]`
+
+A network scanner was deployed. Identify it.
 
 `T1046 Network Service Scanning` `DeviceFileEvents` `Discovery`
+
+**Why It Matters:** Used to map internal hosts for lateral movement targeting.
 
 ```kql
 // Find scanning tools downloaded on attack day
@@ -612,21 +651,25 @@ DeviceFileEvents
 
 ---
 
-#### Q24 - Scanner Hash
-**Objective:** Get the SHA256 of the scanner.
+#### FLAG 24: SCANNER HASH `[MODERATE]`
+
+Identify the SHA256 of the scanner.
 
 `T1046 Network Service Scanning` `DeviceFileEvents` `Malware Identification`
 
-> 💡 Same query as Q23 - the `SHA256` column on the scanner row is your answer.
+**Why It Matters:** Enables detection rule creation and correlation with other threat actor campaigns.
+
+> 💡 Same query as FLAG 23 - the `SHA256` column on the scanner row is your answer.
 
 ---
 
-#### Q25 - Scanner Execution Arguments
-**Objective:** Find the arguments passed to the scanner.
+#### FLAG 25: SCANNER EXECUTION `[MODERATE]`
 
-**Why It Matters:** Portable mode leaves no installation footprint - deliberate evasion.
+The scanner was executed with specific arguments. Find the full arguments as executed.
 
 `T1046 Network Service Scanning` `DeviceProcessEvents` `Discovery`
+
+**Why It Matters:** Portable mode leaves no installation footprint - deliberate evasion technique.
 
 ```kql
 // Find how the scanner was executed
@@ -642,12 +685,13 @@ DeviceProcessEvents
 
 ---
 
-#### Q26 - Network Share Enumeration
-**Objective:** Find the two internal IPs where shares were enumerated.
+#### FLAG 26: NETWORK ENUMERATION `[MODERATE]`
 
-**Why It Matters:** Goal-oriented data targeting - attacker identifying specific exfiltration targets.
+The attacker enumerated network shares on specific hosts. Find the two internal IPs.
 
 `T1135 Network Share Discovery` `DeviceProcessEvents` `Discovery`
+
+**Why It Matters:** Goal-oriented data targeting - attacker identifying specific exfiltration targets.
 
 ```kql
 // Find net view commands used to enumerate shares
@@ -664,14 +708,17 @@ DeviceProcessEvents
 
 ---
 
-### 🔀 SECTION 8: Lateral Movement
+### 🔀 CHAPTER 8: Lateral Movement
 
-#### Q27 - Lateral Account
-**Objective:** Find the account used to access AS-SRV.
+---
 
-**Why It Matters:** Account was obtained from the LSASS dump - demonstrating the cascading impact of credential theft.
+#### FLAG 27: LATERAL ACCOUNT `[HARD]`
+
+An account was used to access AS-SRV. Identify it.
 
 `T1021.001 Remote Desktop` `DeviceLogonEvents` `Lateral Movement`
+
+**Why It Matters:** Account obtained from the LSASS dump - demonstrating the cascading impact of credential theft.
 
 ```kql
 // Find successful remote logons to AS-SRV
@@ -688,14 +735,17 @@ DeviceLogonEvents
 
 ---
 
-### ⬇️ SECTION 9: Tool Transfer
+### ⬇️ CHAPTER 9: Tool Transfer
 
-#### Q28 - First Download Method
-**Objective:** Find the first LOLBin used to download tools.
+---
 
-**Why It Matters:** Native Windows binary abused to bypass security tools that trust system binaries.
+#### FLAG 28: DOWNLOAD METHOD `[MODERATE]`
+
+A living-off-the-land binary was used first but had issues. Identify it.
 
 `T1105 Ingress Tool Transfer` `DeviceProcessEvents` `Tool Transfer`
+
+**Why It Matters:** Native Windows binary abused to bypass security tools that trust system binaries.
 
 ```kql
 // Find LOLBin download activity
@@ -711,12 +761,13 @@ DeviceProcessEvents
 
 ---
 
-#### Q29 - Fallback Download Method
-**Objective:** Find the PowerShell cmdlet used when the first method failed.
+#### FLAG 29: FALLBACK METHOD `[MODERATE]`
 
-**Why It Matters:** Three obfuscation techniques used - base64, string concat, variable splitting - showing attacker adaptability.
+After the first tool failed, another method was used. Find the PowerShell cmdlet.
 
 `T1059.001 PowerShell` `DeviceEvents` `Tool Transfer`
+
+**Why It Matters:** Three obfuscation techniques used - base64, string concat, variable splitting - showing attacker adaptability.
 
 ```kql
 // Find PowerShell download commands used as fallback
@@ -733,14 +784,17 @@ DeviceEvents
 
 ---
 
-### 📦 SECTION 10: Exfiltration
+### 📦 CHAPTER 10: Exfiltration
 
-#### Q30 - Staging Tool
-**Objective:** Find the tool used to compress data before exfiltration.
+---
 
-**Why It Matters:** Double-extortion tactic - stolen data gives the attacker two points of leverage.
+#### FLAG 30: STAGING TOOL `[HARD]`
+
+A tool was used to compress data for exfiltration. Identify it.
 
 `T1560 Archive Collected Data` `DeviceFileEvents` `Exfiltration`
+
+**Why It Matters:** Double-extortion tactic - stolen data gives the attacker two points of leverage over the victim.
 
 ```kql
 // Find compression tools created in ProgramData
@@ -758,21 +812,25 @@ DeviceFileEvents
 
 ---
 
-#### Q31 - Staging Tool Hash
-**Objective:** Get the SHA256 of the staging tool.
+#### FLAG 31: STAGING HASH `[HARD]`
+
+Identify the SHA256 of the staging tool.
 
 `T1560 Archive Collected Data` `DeviceFileEvents` `Malware Identification`
 
-> 💡 Same query as Q30 - the `SHA256` on the staging tool row is your answer.
+**Why It Matters:** Enables threat intelligence correlation and detection rule creation.
+
+> 💡 Same query as FLAG 30 - the `SHA256` on the staging tool row is your answer.
 
 ---
 
-#### Q32 - Exfiltration Archive
-**Objective:** Find the archive created for exfiltration.
+#### FLAG 32: EXFIL ARCHIVE `[HARD]`
 
-**Why It Matters:** Identifying the archive enables scope assessment of stolen data.
+Identify the archive created for exfiltration.
 
 `T1560 Archive Collected Data` `DeviceFileEvents` `Exfiltration`
+
+**Why It Matters:** Identifying the archive enables scope assessment of stolen data.
 
 ```kql
 // Find archive files created on attack day
@@ -789,14 +847,17 @@ DeviceFileEvents
 
 ---
 
-### 💣 SECTION 11: Ransomware Deployment
+### 💣 CHAPTER 11: Ransomware Deployment
 
-#### Q33 - Ransomware Filename
-**Objective:** Find the ransomware binary disguised as a legitimate process.
+---
 
-**Why It Matters:** Masquerading as a system utility avoids suspicion from users and monitoring tools.
+#### FLAG 33: RANSOMWARE FILENAME `[ADVANCED]`
+
+The ransomware was disguised as a legitimate process. Find its filename.
 
 `T1036 Masquerading` `DeviceFileEvents` `Impact Analysis`
+
+**Why It Matters:** Masquerading as a system utility avoids suspicion from users and monitoring tools.
 
 ```kql
 // Find suspicious executables staged on AS-SRV before encryption
@@ -814,21 +875,25 @@ DeviceFileEvents
 
 ---
 
-#### Q34 - Ransomware Hash
-**Objective:** Get the SHA256 of the ransomware binary.
+#### FLAG 34: RANSOMWARE HASH `[ADVANCED]`
+
+Identify the SHA256 of the ransomware binary.
 
 `T1486 Data Encrypted` `DeviceFileEvents` `Malware Identification`
 
-> 💡 Same query as Q33 - the `SHA256` on the ransomware row is your answer.
+**Why It Matters:** Enables global detection signature creation and threat intelligence correlation.
+
+> 💡 Same query as FLAG 33 - the `SHA256` on the ransomware row is your answer.
 
 ---
 
-#### Q35 - Ransomware Staging Process
-**Objective:** Find the process that staged the ransomware on AS-SRV.
+#### FLAG 35: RANSOMWARE STAGING `[ADVANCED]`
 
-**Why It Matters:** Confirms the C2 delivery method and provides a future detection opportunity.
+The ransomware was dropped onto AS-SRV before execution. What process staged it?
 
 `T1059.001 PowerShell` `DeviceFileEvents` `Impact Analysis`
+
+**Why It Matters:** Confirms the C2 delivery method and provides a future detection opportunity.
 
 ```kql
 // Find what process created the ransomware binary on AS-SRV
@@ -845,15 +910,16 @@ DeviceFileEvents
 
 ---
 
-#### Q36 - Recovery Prevention
-**Objective:** Find the command used to delete Volume Shadow Copies.
+#### FLAG 36: RECOVERY PREVENTION `[ADVANCED]`
 
-**Why It Matters:** Prevents file restoration without paying ransom - standard pre-encryption step.
+The attacker deleted backup copies to prevent recovery. Find the full command.
 
 `T1490 Inhibit System Recovery` `DeviceProcessEvents` `Impact Analysis`
 
+**Why It Matters:** Prevents file restoration without paying ransom - standard pre-encryption step.
+
 ```kql
-// Look at what ran in the defense evasion window (use Q12 timestamp as anchor)
+// Look at what ran in the defense evasion window (use FLAG 12 timestamp as anchor)
 DeviceProcessEvents
 | where DeviceName in ("as-pc1", "as-pc2", "as-srv")
 | where TimeGenerated between (datetime(2026-01-27T21:00:00Z) .. datetime(2026-01-27T21:15:00Z))
@@ -865,12 +931,13 @@ DeviceProcessEvents
 
 ---
 
-#### Q37 - Ransom Note Origin
-**Objective:** Find the process that dropped the ransom note.
+#### FLAG 37: RANSOM NOTE ORIGIN `[ADVANCED]`
 
-**Why It Matters:** Confirms the exact binary responsible for encryption and notification.
+A ransom note was dropped after encryption began. What process dropped it?
 
 `T1486 Data Encrypted` `DeviceFileEvents` `Impact Analysis`
+
+**Why It Matters:** Confirms the exact binary responsible for encryption and notification.
 
 ```kql
 // Find what process created the ransom note files
@@ -883,29 +950,33 @@ DeviceFileEvents
 | order by TimeGenerated asc
 ```
 
-> 💡 The `InitiatingProcessFileName` column is your Q37 answer.
+> 💡 The `InitiatingProcessFileName` column is your FLAG 37 answer.
 
 ---
 
-#### Q38 - Encryption Start Time
-**Objective:** Determine when encryption began.
+#### FLAG 38: ENCRYPTION START `[ADVANCED]`
 
-**Why It Matters:** Anchors the impact phase - critical for recovery team prioritization.
+Determine when encryption began. Find the time the ransom note was dropped.
 
 `T1486 Data Encrypted` `DeviceFileEvents` `Timeline Analysis`
 
-> 💡 Same query as Q37 - `TimeGenerated` of the **first row** is your answer. Format as `HH:MM:SS` UTC.
+**Why It Matters:** Anchors the impact phase - critical for recovery team prioritization.
+
+> 💡 Same query as FLAG 37 - `TimeGenerated` of the **first row** is your answer. Format as `HH:MM:SS` UTC.
 
 ---
 
-### 🧹 SECTION 12: Anti-Forensics & Scope
+### 🧹 CHAPTER 12: Anti-Forensics & Scope
 
-#### Q39 - Cleanup Script
-**Objective:** Find the script that deleted the ransomware binary.
+---
 
-**Why It Matters:** Deliberate anti-forensics - prevents recovery and analysis of the ransomware sample.
+#### FLAG 39: CLEANUP SCRIPT `[HARD]`
+
+The ransomware binary was deleted after execution. What script deleted it?
 
 `T1485 Data Destruction` `DeviceFileEvents` `Anti-Forensics`
+
+**Why It Matters:** Deliberate anti-forensics - prevents recovery and analysis of the ransomware sample.
 
 ```kql
 // Find what deleted files after encryption
@@ -922,12 +993,13 @@ DeviceFileEvents
 
 ---
 
-#### Q40 - Affected Hosts
-**Objective:** Determine the full scope of compromised hosts.
+#### FLAG 40: AFFECTED HOSTS `[HARD]`
 
-**Why It Matters:** Ensures no affected systems are missed during remediation.
+Determine the full scope of the compromise. What hosts were affected?
 
 `T1486 Data Encrypted` `DeviceFileEvents` `Scope Analysis`
+
+**Why It Matters:** Ensures no affected systems are missed during remediation.
 
 ```kql
 // Find all hosts where ransom notes were dropped
@@ -996,11 +1068,11 @@ DeviceFileEvents
 
 ## REMEDIATION_ACTIONS
 
-**Immediate** - Isolate AS-PC2 and AS-SRV · Reset `david.mitchell` and `as.srv.administrator` credentials · Remove `C:\Users\Public\AnyDesk.exe` · Block `sync.cloud-endpoint.net`, `cdn.cloud-endpoint.net`, `88.97.164.155`
+**Immediate** - Isolate AS-PC2 and AS-SRV - Reset `david.mitchell` and `as.srv.administrator` credentials - Remove `C:\Users\Public\AnyDesk.exe` - Block `sync.cloud-endpoint.net`, `cdn.cloud-endpoint.net`, `88.97.164.155`
 
-**Short Term** - Restrict remote tools to approved list · Enable PowerShell Script Block Logging · Alert on LOLBin network activity · Monitor Defender registry keys · Hunt for unknown executables in `C:\ProgramData\`
+**Short Term** - Restrict remote tools to approved list - Enable PowerShell Script Block Logging - Alert on LOLBin network activity - Monitor Defender registry keys - Hunt for unknown executables in `C:\ProgramData\`
 
-**Long Term** - MFA for all RDP · Network segmentation · Honeypot files in shares · Full remediation review of "The Broker" · Immutable off-site backups · Application allowlisting
+**Long Term** - MFA for all RDP - Network segmentation - Honeypot files in shares - Full remediation review of "The Broker" - Immutable off-site backups - Application allowlisting
 
 ---
 
